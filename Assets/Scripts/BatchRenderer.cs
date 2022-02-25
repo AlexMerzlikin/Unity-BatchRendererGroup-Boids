@@ -6,6 +6,43 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Random = UnityEngine.Random;
 
+// Unity provided shaders such as Universal Render Pipeline/Lit expect
+// unity_ObjectToWorld and unity_WorldToObject in a special packed 48 byte
+// format when the DOTS_INSTANCING_ON keyword is enabled.
+// This saves both GPU memory and GPU bandwidth.
+// We define a convenience type here so we can easily convert into this format.
+public struct PackedMatrix
+{
+    public float m00;
+    public float m10;
+    public float m20;
+    public float m01;
+    public float m11;
+    public float m21;
+    public float m02;
+    public float m12;
+    public float m22;
+    public float m03;
+    public float m13;
+    public float m23;
+
+    public PackedMatrix(Matrix4x4 m)
+    {
+        m00 = m.m00;
+        m10 = m.m10;
+        m20 = m.m20;
+        m01 = m.m01;
+        m11 = m.m11;
+        m21 = m.m21;
+        m02 = m.m02;
+        m12 = m.m12;
+        m22 = m.m22;
+        m03 = m.m03;
+        m13 = m.m13;
+        m23 = m.m23;
+    }
+}
+
 // This example demonstrates how to write a very minimal BatchRendererGroup
 // based custom renderer using the Universal Render Pipeline to help
 // getting started with using BatchRendererGroup.
@@ -36,42 +73,6 @@ public class BatchRenderer : MonoBehaviour
     private const uint ByteAddressWorldToObject = ByteAddressObjectToWorld + SizeOfPackedMatrix * NumInstances;
     private const uint ByteAddressColor = ByteAddressWorldToObject + SizeOfPackedMatrix * NumInstances;
 
-    // Unity provided shaders such as Universal Render Pipeline/Lit expect
-    // unity_ObjectToWorld and unity_WorldToObject in a special packed 48 byte
-    // format when the DOTS_INSTANCING_ON keyword is enabled.
-    // This saves both GPU memory and GPU bandwidth.
-    // We define a convenience type here so we can easily convert into this format.
-    private struct PackedMatrix
-    {
-        public float m00;
-        public float m10;
-        public float m20;
-        public float m01;
-        public float m11;
-        public float m21;
-        public float m02;
-        public float m12;
-        public float m22;
-        public float m03;
-        public float m13;
-        public float m23;
-
-        public PackedMatrix(Matrix4x4 m)
-        {
-            m00 = m.m00;
-            m10 = m.m10;
-            m20 = m.m20;
-            m01 = m.m01;
-            m11 = m.m11;
-            m21 = m.m21;
-            m02 = m.m02;
-            m12 = m.m12;
-            m22 = m.m22;
-            m03 = m.m03;
-            m13 = m.m13;
-            m23 = m.m23;
-        }
-    }
 
     // Raw buffers are allocated in ints, define an utility method to compute the required
     // amount of ints for our data.
