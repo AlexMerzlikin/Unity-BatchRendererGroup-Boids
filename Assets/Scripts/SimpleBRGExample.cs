@@ -2,6 +2,7 @@ using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -11,142 +12,96 @@ using UnityEngine.Rendering;
 public class SimpleBRGExample : MonoBehaviour
 {
     // Set this to a suitable Mesh via the Inspector, such as a Cube mesh
-    public Mesh mesh;
+    [SerializeField] private Mesh _mesh;
+
     // Set this to a suitable Material via the Inspector, such as a default material that
     // uses Universal Render Pipeline/Lit
-    public Material material;
+    [SerializeField] private Material _material;
 
-    private BatchRendererGroup m_BRG;
+    private BatchRendererGroup _brg;
 
-    private GraphicsBuffer m_InstanceData;
-    private BatchID m_BatchID;
-    private BatchMeshID m_MeshID;
-    private BatchMaterialID m_MaterialID;
+    private GraphicsBuffer _instanceData;
+    private BatchID _batchID;
+    private BatchMeshID _meshID;
+    private BatchMaterialID _materialID;
 
     // Some helper constants to make calculations later a bit more convenient.
-    private const int kSizeOfMatrix = sizeof(float) * 4 * 4;
-    private const int kSizeOfPackedMatrix = sizeof(float) * 4 * 3;
-    private const int kSizeOfFloat4 = sizeof(float) * 4;
-    private const int kBytesPerInstance = (kSizeOfPackedMatrix * 2) + kSizeOfFloat4;
-    private const int kExtraBytes = kSizeOfMatrix * 2;
-    private const int kNumInstances = 3;
-
-    // Unity provided shaders such as Universal Render Pipeline/Lit expect
-    // unity_ObjectToWorld and unity_WorldToObject in a special packed 48 byte
-    // format when the DOTS_INSTANCING_ON keyword is enabled.
-    // This saves both GPU memory and GPU bandwidth.
-    // We define a convenience type here so we can easily convert into this format.
-    struct PackedMatrix
-    {
-        public float c0x;
-        public float c0y;
-        public float c0z;
-        public float c1x;
-        public float c1y;
-        public float c1z;
-        public float c2x;
-        public float c2y;
-        public float c2z;
-        public float c3x;
-        public float c3y;
-        public float c3z;
-
-        public PackedMatrix(Matrix4x4 m)
-        {
-            c0x = m.m00;
-            c0y = m.m10;
-            c0z = m.m20;
-            c1x = m.m01;
-            c1y = m.m11;
-            c1z = m.m21;
-            c2x = m.m02;
-            c2y = m.m12;
-            c2z = m.m22;
-            c3x = m.m03;
-            c3y = m.m13;
-            c3z = m.m23;
-        }
-    }
+    private const int SizeOfMatrix = sizeof(float) * 4 * 4;
+    private const int SizeOfPackedMatrix = sizeof(float) * 4 * 3;
+    private const int BytesPerInstance = (SizeOfPackedMatrix * 2);
+    private const int ExtraBytes = SizeOfMatrix;
+    private const int NumInstances = 1;
 
     // Raw buffers are allocated in ints, define an utility method to compute the required
     // amount of ints for our data.
-    int BufferCountForInstances(int bytesPerInstance, int numInstances, int extraBytes = 0)
+    private static int BufferCountForInstances(int bytesPerInstance, int numInstances, int extraBytes = 0)
     {
         // Round byte counts to int multiples
         bytesPerInstance = (bytesPerInstance + sizeof(int) - 1) / sizeof(int) * sizeof(int);
         extraBytes = (extraBytes + sizeof(int) - 1) / sizeof(int) * sizeof(int);
-        int totalBytes = bytesPerInstance * numInstances + extraBytes;
+        var totalBytes = bytesPerInstance * numInstances + extraBytes;
         return totalBytes / sizeof(int);
     }
 
     // During initialization, we will allocate all required objects, and set up our custom instance data.
-    void Start()
+    private void Start()
     {
         // Create the BatchRendererGroup and register assets
-        m_BRG = new BatchRendererGroup(this.OnPerformCulling, IntPtr.Zero);
-        m_MeshID = m_BRG.RegisterMesh(mesh);
-        m_MaterialID = m_BRG.RegisterMaterial(material);
+        _brg = new BatchRendererGroup(OnPerformCulling, IntPtr.Zero);
+        _meshID = _brg.RegisterMesh(_mesh);
+        _materialID = _brg.RegisterMaterial(_material);
 
         // Create the buffer that holds our instance data
-        m_InstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw,
-            BufferCountForInstances(kBytesPerInstance, kNumInstances, kExtraBytes),
+        var bufferCountForInstances = BufferCountForInstances(BytesPerInstance, NumInstances, ExtraBytes);
+        _instanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw,
+            bufferCountForInstances,
             sizeof(int));
 
         // Place one zero matrix at the start of the instance data buffer, so loads from address 0 will return zero
         var zero = new Matrix4x4[1] { Matrix4x4.zero };
 
         // Create transform matrices for our three example instances
-        var matrices = new Matrix4x4[kNumInstances]
-        {
-            Matrix4x4.Translate(new Vector3(-2, 0, 0)),
-            Matrix4x4.Translate(new Vector3(0, 0, 0)),
-            Matrix4x4.Translate(new Vector3(2, 0, 0)),
-        };
+        var matrices = new float4x4[NumInstances] { Matrix4x4.Translate(new Vector3(2, 0, 0)), };
 
         // Convert the transform matrices into the packed format expected by the shader
-        var objectToWorld = new PackedMatrix[kNumInstances]
+        var objectToWorld = new float3x4[NumInstances]
         {
-            new PackedMatrix(matrices[0]),
-            new PackedMatrix(matrices[1]),
-            new PackedMatrix(matrices[2]),
+            new(matrices[0].c0.x,matrices[0].c0.y,matrices[0].c0.z, matrices[0].c0.w,
+                matrices[0].c1.x,matrices[0].c1.y,matrices[0].c1.z, matrices[0].c1.w,
+                matrices[0].c2.x,matrices[0].c2.y,matrices[0].c2.z, matrices[0].c2.w
+                ),
         };
 
         // Also create packed inverse matrices
-        var worldToObject = new PackedMatrix[kNumInstances]
+        var inverse = math.inverse(matrices[0]);
+        var worldToObject = new float3x4[NumInstances]
         {
-            new PackedMatrix(matrices[0].inverse),
-            new PackedMatrix(matrices[1].inverse),
-            new PackedMatrix(matrices[2].inverse),
+            new(inverse.c0.x,inverse.c0.y,inverse.c0.z, inverse.c0.w,
+                inverse.c1.x,inverse.c1.y,inverse.c1.z, inverse.c1.w,
+                inverse.c2.x,inverse.c2.y,inverse.c2.z, inverse.c2.w
+            ),
         };
 
-        // Make all instances have unique colors
-        var colors = new Vector4[kNumInstances]
-        {
-            new Vector4(1, 0, 0, 1),
-            new Vector4(0, 1, 0, 1),
-            new Vector4(0, 0, 1, 1),
-        };
 
         // In this simple example, the instance data is placed into the buffer like this:
         // Offset | Description
         //      0 | 64 bytes of zeroes, so loads from address 0 return zeroes
-        //     64 | 32 uninitialized bytes to make working with SetData easier, otherwise unnecessary
-        //     96 | unity_ObjectToWorld, three packed float3x4 matrices
-        //    240 | unity_WorldToObject, three packed float3x4 matrices
-        //    384 | _BaseColor, three float4s
+        //     64 | unity_ObjectToWorld, three packed float3x4 matrices
+        //    112 | unity_WorldToObject, three packed float3x4 matrices
 
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
         // is expressed as source array elements, so it is easier to work in multiples of sizeof(PackedMatrix).
-        uint byteAddressObjectToWorld = kSizeOfPackedMatrix * 2;
-        uint byteAddressWorldToObject = byteAddressObjectToWorld + kSizeOfPackedMatrix * kNumInstances;
-        uint byteAddressColor = byteAddressWorldToObject + kSizeOfPackedMatrix * kNumInstances;
+        const uint byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * NumInstances;
+        // uint byteAddressColor = byteAddressWorldToObject + kSizeOfPackedMatrix * kNumInstances;
 
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
-        m_InstanceData.SetData(zero, 0, 0, 1);
-        m_InstanceData.SetData(objectToWorld, 0, (int)(byteAddressObjectToWorld / kSizeOfPackedMatrix), objectToWorld.Length);
-        m_InstanceData.SetData(worldToObject, 0, (int)(byteAddressWorldToObject / kSizeOfPackedMatrix), worldToObject.Length);
-        m_InstanceData.SetData(colors, 0, (int)(byteAddressColor / kSizeOfFloat4), colors.Length);
+        _instanceData.SetData(zero, 0, 0, 1);
+        _instanceData.SetData(objectToWorld, 0, (int)(SizeOfPackedMatrix / SizeOfPackedMatrix),
+            objectToWorld.Length);
+        _instanceData.SetData(worldToObject, 0, (int)(byteAddressWorldToObject / SizeOfPackedMatrix),
+            worldToObject.Length);
+        // m_InstanceData.SetData(colors, 0, (int)(byteAddressColor / kSizeOfFloat4), colors.Length);
 
         // Set up metadata values to point to the instance data. Set the most significant bit 0x80000000 in each,
         // which instructs the shader that the data is an array with one value per instance, indexed by the instance index.
@@ -155,15 +110,24 @@ public class SimpleBRGExample : MonoBehaviour
         // 0x00000000 metadata value so that the value will be loaded from the start of the buffer, which is
         // where we uploaded the matrix "zero" to, so such loads are guaranteed to return zero, which is a reasonable
         // default value.
-        var metadata = new NativeArray<MetadataValue>(3, Allocator.Temp);
-        metadata[0] = new MetadataValue { NameID = Shader.PropertyToID("unity_ObjectToWorld"), Value = 0x80000000 | byteAddressObjectToWorld, };
-        metadata[1] = new MetadataValue { NameID = Shader.PropertyToID("unity_WorldToObject"), Value = 0x80000000 | byteAddressWorldToObject, };
-        metadata[2] = new MetadataValue { NameID = Shader.PropertyToID("_BaseColor"), Value = 0x80000000 | byteAddressColor, };
+        var metadata = new NativeArray<MetadataValue>(2, Allocator.Temp)
+        {
+            [0] = new MetadataValue
+            {
+                NameID = Shader.PropertyToID("unity_ObjectToWorld"), Value = 0x80000000 | SizeOfPackedMatrix,
+            },
+            [1] = new MetadataValue
+            {
+                NameID = Shader.PropertyToID("unity_WorldToObject"),
+                Value = 0x80000000 | byteAddressWorldToObject,
+            }
+        };
+        // metadata[2] = new MetadataValue { NameID = Shader.PropertyToID("_BaseColor"), Value = 0x80000000 | byteAddressColor, };
 
         // Finally, create a batch for our instances, and make the batch use the GraphicsBuffer with our
         // instance data, and the metadata values that specify where the properties are. Note that
         // we do not need to pass any batch size here.
-        m_BatchID = m_BRG.AddBatch(metadata, m_InstanceData.bufferHandle);
+        _batchID = _brg.AddBatch(metadata, _instanceData.bufferHandle);
     }
 
     // We need to dispose our GraphicsBuffer and BatchRendererGroup when our script is no longer used,
@@ -171,14 +135,14 @@ public class SimpleBRGExample : MonoBehaviour
     // BatchRendererGroup are automatically disposed when disposing the BatchRendererGroup.
     private void OnDisable()
     {
-        m_InstanceData.Dispose();
-        m_BRG.Dispose();
+        _instanceData.Dispose();
+        _brg.Dispose();
     }
 
     // The callback method called by Unity whenever it visibility culls to determine which
     // objects to draw. This method will output draw commands that describe to Unity what
     // should be drawn for this BatchRendererGroup.
-    public unsafe JobHandle OnPerformCulling(
+    private unsafe JobHandle OnPerformCulling(
         BatchRendererGroup rendererGroup,
         BatchCullingContext cullingContext,
         BatchCullingOutput cullingOutput,
@@ -186,7 +150,7 @@ public class SimpleBRGExample : MonoBehaviour
     {
         // UnsafeUtility.Malloc() requires an alignment, so use the largest integer type's alignment
         // which is a reasonable default.
-        int alignment = UnsafeUtility.AlignOf<long>();
+        var alignment = UnsafeUtility.AlignOf<long>();
 
         // Acquire a pointer to the BatchCullingOutputDrawCommands struct so we can easily
         // modify it directly.
@@ -202,12 +166,12 @@ public class SimpleBRGExample : MonoBehaviour
         // The arrays must always be allocated using Allocator.TempJob.
         drawCommands->drawCommands = (BatchDrawCommand*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawCommand>(), alignment, Allocator.TempJob);
         drawCommands->drawRanges = (BatchDrawRange*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawRange>(), alignment, Allocator.TempJob);
-        drawCommands->visibleInstances = (int*)UnsafeUtility.Malloc(kNumInstances * sizeof(int), alignment, Allocator.TempJob);
+        drawCommands->visibleInstances = (int*)UnsafeUtility.Malloc(NumInstances * sizeof(int), alignment, Allocator.TempJob);
         drawCommands->drawCommandPickingInstanceIDs = null;
 
         drawCommands->drawCommandCount = 1;
         drawCommands->drawRangeCount = 1;
-        drawCommands->visibleInstanceCount = kNumInstances;
+        drawCommands->visibleInstanceCount = NumInstances;
 
         // Our example does not use depth sorting, so we can leave the instanceSortingPositions as null.
         drawCommands->instanceSortingPositions = null;
@@ -217,10 +181,10 @@ public class SimpleBRGExample : MonoBehaviour
         // starting from offset 0 in the array, using the batch, material and mesh
         // IDs that we registered in the Start() method. No special flags are set.
         drawCommands->drawCommands[0].visibleOffset = 0;
-        drawCommands->drawCommands[0].visibleCount = kNumInstances;
-        drawCommands->drawCommands[0].batchID = m_BatchID;
-        drawCommands->drawCommands[0].materialID = m_MaterialID;
-        drawCommands->drawCommands[0].meshID = m_MeshID;
+        drawCommands->drawCommands[0].visibleCount = NumInstances;
+        drawCommands->drawCommands[0].batchID = _batchID;
+        drawCommands->drawCommands[0].materialID = _materialID;
+        drawCommands->drawCommands[0].meshID = _meshID;
         drawCommands->drawCommands[0].submeshIndex = 0;
         drawCommands->drawCommands[0].splitVisibilityMask = 0xff;
         drawCommands->drawCommands[0].flags = 0;
@@ -238,8 +202,10 @@ public class SimpleBRGExample : MonoBehaviour
         // Finally, write the actual visible instance indices to their array. In a more complicated
         // implementation, this output would depend on what we determined to be visible, but in this example
         // we will just assume that everything is visible.
-        for (int i = 0; i < kNumInstances; ++i)
+        for (var i = 0; i < NumInstances; ++i)
+        {
             drawCommands->visibleInstances[i] = i;
+        }
 
         // This simple example does not use jobs, so we can just return an empty JobHandle.
         // Performance sensitive applications are encouraged to use Burst jobs to implement
