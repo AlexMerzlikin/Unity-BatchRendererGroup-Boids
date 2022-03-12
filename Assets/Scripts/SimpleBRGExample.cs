@@ -17,13 +17,19 @@ public class SimpleBRGExample : MonoBehaviour
     // Set this to a suitable Material via the Inspector, such as a default material that
     // uses Universal Render Pipeline/Lit
     [SerializeField] private Material _material;
-
+    [SerializeField] private float _motionSpeed;
+    [SerializeField] private float _motionAmplitude;
+    [SerializeField] private Vector3 _position;
+    [SerializeField] private Vector3 _motionDirection;
+    
     private BatchRendererGroup _brg;
-
     private GraphicsBuffer _instanceData;
     private BatchID _batchID;
     private BatchMeshID _meshID;
     private BatchMaterialID _materialID;
+    private float _phase;
+    private float3x4[] _objectToWorld;
+    private float3x4[] _worldToObject;
 
     // Some helper constants to make calculations later a bit more convenient.
     private const int SizeOfMatrix = sizeof(float) * 4 * 4;
@@ -61,25 +67,25 @@ public class SimpleBRGExample : MonoBehaviour
         var zero = new Matrix4x4[1] { Matrix4x4.zero };
 
         // Create transform matrices for our three example instances
-        var matrices = new float4x4[NumInstances] { Matrix4x4.Translate(new Vector3(2, 0, 0)), };
+        var matrices = new float4x4[NumInstances] { Matrix4x4.Translate(_position) };
 
         // Convert the transform matrices into the packed format expected by the shader
-        var objectToWorld = new float3x4[NumInstances]
+        _objectToWorld = new float3x4[NumInstances]
         {
-            new(matrices[0].c0.x,matrices[0].c0.y,matrices[0].c0.z, matrices[0].c0.w,
-                matrices[0].c1.x,matrices[0].c1.y,matrices[0].c1.z, matrices[0].c1.w,
-                matrices[0].c2.x,matrices[0].c2.y,matrices[0].c2.z, matrices[0].c2.w
-                ),
+            new(matrices[0].c0.x, matrices[0].c1.x, matrices[0].c2.x, matrices[0].c3.x,
+                matrices[0].c0.y, matrices[0].c1.y, matrices[0].c2.y, matrices[0].c3.y,
+                matrices[0].c0.z, matrices[0].c1.z, matrices[0].c2.z, matrices[0].c3.z
+            )
         };
 
         // Also create packed inverse matrices
         var inverse = math.inverse(matrices[0]);
-        var worldToObject = new float3x4[NumInstances]
+        _worldToObject = new float3x4[NumInstances]
         {
-            new(inverse.c0.x,inverse.c0.y,inverse.c0.z, inverse.c0.w,
-                inverse.c1.x,inverse.c1.y,inverse.c1.z, inverse.c1.w,
-                inverse.c2.x,inverse.c2.y,inverse.c2.z, inverse.c2.w
-            ),
+            new(inverse.c0.x, inverse.c1.x, inverse.c2.x, inverse.c3.x,
+                inverse.c0.y, inverse.c1.y, inverse.c2.y, inverse.c3.y,
+                inverse.c0.z, inverse.c1.z, inverse.c2.z, inverse.c3.z
+            )
         };
 
 
@@ -97,10 +103,10 @@ public class SimpleBRGExample : MonoBehaviour
 
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
         _instanceData.SetData(zero, 0, 0, 1);
-        _instanceData.SetData(objectToWorld, 0, (int)(SizeOfPackedMatrix / SizeOfPackedMatrix),
-            objectToWorld.Length);
-        _instanceData.SetData(worldToObject, 0, (int)(byteAddressWorldToObject / SizeOfPackedMatrix),
-            worldToObject.Length);
+        _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
+            _objectToWorld.Length);
+        _instanceData.SetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix),
+            _worldToObject.Length);
         // m_InstanceData.SetData(colors, 0, (int)(byteAddressColor / kSizeOfFloat4), colors.Length);
 
         // Set up metadata values to point to the instance data. Set the most significant bit 0x80000000 in each,
@@ -122,12 +128,42 @@ public class SimpleBRGExample : MonoBehaviour
                 Value = 0x80000000 | byteAddressWorldToObject,
             }
         };
-        // metadata[2] = new MetadataValue { NameID = Shader.PropertyToID("_BaseColor"), Value = 0x80000000 | byteAddressColor, };
 
         // Finally, create a batch for our instances, and make the batch use the GraphicsBuffer with our
         // instance data, and the metadata values that specify where the properties are. Note that
         // we do not need to pass any batch size here.
         _batchID = _brg.AddBatch(metadata, _instanceData.bufferHandle);
+    }
+
+    private void Update()
+    {
+        _phase += Time.fixedDeltaTime * _motionSpeed;
+        var translation = _motionDirection * _motionAmplitude;
+        var pos = translation * Mathf.Cos(_phase);
+        UpdatePositions(pos);
+    }
+
+    private void UpdatePositions(Vector3 pos)
+    {
+        _instanceData.GetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix), 1);
+        const uint byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * NumInstances;
+        _instanceData.GetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix), 1);
+        _objectToWorld[0] = new float3x4(
+            new float3(_objectToWorld[0].c0.x, _objectToWorld[0].c0.y, _objectToWorld[0].c0.z),
+            new float3(_objectToWorld[0].c1.x, _objectToWorld[0].c1.y, _objectToWorld[0].c1.z),
+            new float3(_objectToWorld[0].c2.x, _objectToWorld[0].c2.y, _objectToWorld[0].c2.z),
+            new float3(_objectToWorld[0].c3.x + pos.x, _objectToWorld[0].c3.y + pos.y, _objectToWorld[0].c3.z + pos.z)
+        );
+        _worldToObject[0] = new float3x4(
+            new float3(_worldToObject[0].c0.x, _worldToObject[0].c0.y, _worldToObject[0].c0.z),
+            new float3(_worldToObject[0].c1.x, _worldToObject[0].c1.y, _worldToObject[0].c1.z),
+            new float3(_worldToObject[0].c2.x, _worldToObject[0].c2.y, _worldToObject[0].c2.z),
+            new float3(_worldToObject[0].c3.x - pos.x, _worldToObject[0].c3.y - pos.y, _worldToObject[0].c3.z - pos.z)
+        );
+        _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
+            _objectToWorld.Length);
+        _instanceData.SetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix),
+            _worldToObject.Length);
     }
 
     // We need to dispose our GraphicsBuffer and BatchRendererGroup when our script is no longer used,
