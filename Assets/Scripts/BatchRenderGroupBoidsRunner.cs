@@ -11,32 +11,26 @@ namespace ThousandAnt.Boids
 {
     public unsafe class BatchRenderGroupBoidsRunner : Runner
     {
-        public Mesh Mesh;
-        public Material Material;
-        public Color Initial;
-        public Color Final;
+        [SerializeField] private Mesh _mesh;
+        [SerializeField] private Material _material;
+        [SerializeField] private Color _initial;
+        [SerializeField] private Color _final;
 
-        private MaterialPropertyBlock tempBlock;
-        private PinnedMatrixArray matrices;
-        private NativeArray<float> noiseOffsets;
-        private float3* centerFlock;
-        private JobHandle boidsHandle;
-        private Vector4[] colors;
+        private MaterialPropertyBlock _tempBlock;
+        private PinnedMatrixArray _matrices;
+        private NativeArray<float> _noiseOffsets;
+        private float3* _centerFlock;
+        private JobHandle _boidsHandle;
+        private Vector4[] _colors;
         private static readonly int ColorProperty = Shader.PropertyToID("_Color");
 
-
-        [SerializeField] private float m_motionSpeed = 3.0f;
-        [SerializeField] private float m_motionAmplitude = 2.0f;
-        [SerializeField] private float m_spacingFactor = 1.0f;
-
-        private BatchRendererGroup m_BatchRendererGroup;
-        private GraphicsBuffer m_GPUPersistentInstanceData;
-        private NativeArray<Vector4> m_sysmemBuffer;
-        private BatchID m_batchID;
-        private BatchMaterialID m_materialID;
-        private BatchMeshID m_meshID;
-        private bool m_initialized;
-        private float m_phase;
+        private BatchRendererGroup _batchRendererGroup;
+        private GraphicsBuffer _gpuPersistentInstanceData;
+        private NativeArray<Vector4> _sysmemBuffer;
+        private BatchID _batchID;
+        private BatchMaterialID _materialID;
+        private BatchMeshID _meshID;
+        private bool _initialized;
 
 
         private void Start()
@@ -47,57 +41,56 @@ namespace ThousandAnt.Boids
 
         private void InitBatchRendererGroup()
         {
-            m_BatchRendererGroup = new BatchRendererGroup(OnPerformCulling, IntPtr.Zero);
+            _batchRendererGroup = new BatchRendererGroup(OnPerformCulling, IntPtr.Zero);
 
             // Bounds
             var bounds = new Bounds(new Vector3(0, 0, 0), new Vector3(1048576.0f, 1048576.0f, 1048576.0f));
-            m_BatchRendererGroup.SetGlobalBounds(bounds);
+            _batchRendererGroup.SetGlobalBounds(bounds);
 
             // Register mesh and material
-            if (Mesh)
+            if (_mesh)
             {
-                m_meshID = m_BatchRendererGroup.RegisterMesh(Mesh);
+                _meshID = _batchRendererGroup.RegisterMesh(_mesh);
             }
 
-            if (Material)
+            if (_material)
             {
-                m_materialID = m_BatchRendererGroup.RegisterMaterial(Material);
+                _materialID = _batchRendererGroup.RegisterMaterial(_material);
             }
 
             // Batch metadata buffer
-            int objectToWorldID = Shader.PropertyToID("unity_ObjectToWorld");
-            int matrixPreviousMID = Shader.PropertyToID("unity_MatrixPreviousM");
-            int worldToObjectID = Shader.PropertyToID("unity_WorldToObject");
-            int colorID = Shader.PropertyToID("_BaseColor");
+            var objectToWorldID = Shader.PropertyToID("unity_ObjectToWorld");
+            var matrixPreviousMID = Shader.PropertyToID("unity_MatrixPreviousM");
+            var worldToObjectID = Shader.PropertyToID("unity_WorldToObject");
+            var colorID = Shader.PropertyToID("_BaseColor");
 
             // Generate a grid of objects...
-            int bigDataBufferVector4Count =
-                4 + Size * (3 * 3 + 1); // 4xfloat4 zero + per instance = { 3x mat4x3, 1x float4 color }
-            m_sysmemBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
-            m_GPUPersistentInstanceData =
+            var bigDataBufferVector4Count = 4 + Size * (3 * 3 + 1); // 4xfloat4 zero + per instance = { 3x mat4x3, 1x float4 color }
+            _sysmemBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
+            _gpuPersistentInstanceData =
                 new GraphicsBuffer(GraphicsBuffer.Target.Raw, (int) bigDataBufferVector4Count * 16 / 4, 4);
 
             // 64 bytes of zeroes, so loads from address 0 return zeroes. This is a BatchRendererGroup convention.
             const int positionOffset = 4;
-            m_sysmemBuffer[0] = new Vector4(0, 0, 0, 0);
-            m_sysmemBuffer[1] = new Vector4(0, 0, 0, 0);
-            m_sysmemBuffer[2] = new Vector4(0, 0, 0, 0);
-            m_sysmemBuffer[3] = new Vector4(0, 0, 0, 0);
+            _sysmemBuffer[0] = new Vector4(0, 0, 0, 0);
+            _sysmemBuffer[1] = new Vector4(0, 0, 0, 0);
+            _sysmemBuffer[2] = new Vector4(0, 0, 0, 0);
+            _sysmemBuffer[3] = new Vector4(0, 0, 0, 0);
 
             // Matrices
             UpdatePositions();
 
             // Colors
-            int colorOffset = positionOffset + Size * 3 * 3;
-            for (int i = 0; i < Size; i++)
+            var colorOffset = positionOffset + Size * 3 * 3;
+            for (var i = 0; i < Size; i++)
             {
-                Color col = Color.HSVToRGB((i / (float) Size) % 1.0f, 1.0f, 1.0f);
+                var col = Color.HSVToRGB((i / (float) Size) % 1.0f, 1.0f, 1.0f);
 
                 // write colors right after the 4x3 matrices
-                m_sysmemBuffer[colorOffset + i] = new Vector4(col.r, col.g, col.b, 1.0f);
+                _sysmemBuffer[colorOffset + i] = new Vector4(col.r, col.g, col.b, 1.0f);
             }
 
-            m_GPUPersistentInstanceData.SetData(m_sysmemBuffer);
+            _gpuPersistentInstanceData.SetData(_sysmemBuffer);
 
             var batchMetadata =
                 new NativeArray<MetadataValue>(4, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
@@ -110,60 +103,56 @@ namespace ThousandAnt.Boids
                         true),
                     [3] = CreateMetadataValue(colorID, 64 + Size * UnsafeUtility.SizeOf<Vector4>() * 3 * 3, true)
                 };
-            // matrices
-            // previous matrices
-            // inverse matrices
-            // colors
 
             // Register batch
-            m_batchID = m_BatchRendererGroup.AddBatch(batchMetadata, m_GPUPersistentInstanceData.bufferHandle);
+            _batchID = _batchRendererGroup.AddBatch(batchMetadata, _gpuPersistentInstanceData.bufferHandle);
 
-            m_initialized = true;
+            _initialized = true;
         }
 
         private void InitBoids()
         {
-            tempBlock = new MaterialPropertyBlock();
-            matrices = new PinnedMatrixArray(Size);
-            noiseOffsets = new NativeArray<float>(Size, Allocator.Persistent);
-            colors = new Vector4[Size];
+            _tempBlock = new MaterialPropertyBlock();
+            _matrices = new PinnedMatrixArray(Size);
+            _noiseOffsets = new NativeArray<float>(Size, Allocator.Persistent);
+            _colors = new Vector4[Size];
 
             for (int i = 0; i < Size; i++)
             {
                 var pos = transform.position + Random.insideUnitSphere * Radius;
                 var rotation = Quaternion.Slerp(transform.rotation, Random.rotation, 0.3f);
-                noiseOffsets[i] = Random.value * 10f;
-                matrices.Src[i] = Matrix4x4.TRS(pos, rotation, Vector3.one);
+                _noiseOffsets[i] = Random.value * 10f;
+                _matrices.Src[i] = Matrix4x4.TRS(pos, rotation, Vector3.one);
 
-                colors[i] = new Color(
-                    Random.Range(Initial.r, Final.r),
-                    Random.Range(Initial.b, Final.b),
-                    Random.Range(Initial.g, Final.g),
-                    Random.Range(Initial.a, Final.a));
+                _colors[i] = new Color(
+                    Random.Range(_initial.r, _final.r),
+                    Random.Range(_initial.b, _final.b),
+                    Random.Range(_initial.g, _final.g),
+                    Random.Range(_initial.a, _final.a));
             }
 
-            tempBlock.SetVectorArray(ColorProperty, colors);
+            _tempBlock.SetVectorArray(ColorProperty, _colors);
 
-            centerFlock = (float3*) UnsafeUtility.Malloc(
+            _centerFlock = (float3*) UnsafeUtility.Malloc(
                 UnsafeUtility.SizeOf<float3>(),
                 UnsafeUtility.AlignOf<float3>(),
                 Allocator.Persistent);
 
-            UnsafeUtility.MemSet(centerFlock, 0, UnsafeUtility.SizeOf<float3>());
+            UnsafeUtility.MemSet(_centerFlock, 0, UnsafeUtility.SizeOf<float3>());
         }
 
 
         private void Update()
         {
             // Complete all jobs at the start of the frame.
-            boidsHandle.Complete();
+            _boidsHandle.Complete();
 
             // Set up the transform so that we have cinemachine to look at
-            transform.position = *centerFlock;
+            transform.position = *_centerFlock;
 
             UpdatePositions();
             // upload the full buffer
-            m_GPUPersistentInstanceData.SetData(m_sysmemBuffer);
+            _gpuPersistentInstanceData.SetData(_sysmemBuffer);
             // for (int i = 0; i < Mesh.subMeshCount; i++)
             // {
             //     // Draw all elements, because we use a pinned array, the pointer is
@@ -179,45 +168,43 @@ namespace ThousandAnt.Boids
 
             var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
             {
-                Matrices = matrices.SrcPtr,
-                Center = centerFlock,
-                Size = matrices.Size
+                Matrices = _matrices.SrcPtr,
+                Center = _centerFlock,
+                Size = _matrices.Size
             }.Schedule();
 
             var boidJob = new BoidsPointerOnly.BatchedBoidJob
             {
                 Weights = Weights,
                 Goal = Destination.position,
-                NoiseOffsets = noiseOffsets,
+                NoiseOffsets = _noiseOffsets,
                 Time = Time.time,
                 DeltaTime = Time.deltaTime,
                 MaxDist = SeparationDistance,
                 Speed = MaxSpeed,
                 RotationSpeed = RotationSpeed,
-                Size = matrices.Size,
-                Src = matrices.SrcPtr,
-                Dst = matrices.DstPtr,
-            }.Schedule(matrices.Size, 32);
+                Size = _matrices.Size,
+                Src = _matrices.SrcPtr,
+                Dst = _matrices.DstPtr,
+            }.Schedule(_matrices.Size, 32);
 
             var combinedJob = JobHandle.CombineDependencies(boidJob, avgCenterJob);
 
-            boidsHandle = new BoidsPointerOnly.CopyMatrixJob
+            _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
             {
-                Dst = matrices.SrcPtr,
-                Src = matrices.DstPtr
-            }.Schedule(matrices.Size, 32, combinedJob);
+                Dst = _matrices.SrcPtr,
+                Src = _matrices.DstPtr
+            }.Schedule(_matrices.Size, 32, combinedJob);
         }
 
         private void UpdatePositions()
         {
-            int positionOffset = 4;
-            int itemCountOffset = Size * Size * 3; // 3xfloat4 per matrix
+            const int positionOffset = 4;
+            var itemCountOffset = Size * Size * 3; // 3xfloat4 per matrix
 
-            for (int z = 0; z < Size; z++)
+            for (var i = 0; i < Size; i++)
             {
                 {
-                    int i = z;
-
                     /*
                      *  mat4x3 packed like this:
                      *
@@ -229,58 +216,36 @@ namespace ThousandAnt.Boids
                                 );
                     */
 
-                    // update previous matrix with previous frame current matrix
-                    // m_sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset] =
-                    //     m_sysmemBuffer[positionOffset + i * 3 + 0];
-                    // m_sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset] =
-                    //     m_sysmemBuffer[positionOffset + i * 3 + 1];
-                    // m_sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset] =
-                    //     m_sysmemBuffer[positionOffset + i * 3 + 2];
-
-                    // m_sysmemBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0, 0, 0);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0, 0, 0);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 2] = new Vector4(1, px + pos.x, pos.y, pz + pos.z);
-                    //
-                    // // compute the new inverse matrix
-                    // m_sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset * 2] = new Vector4(1, 0, 0, 0);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset * 2] = new Vector4(1, 0, 0, 0);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset * 2] = new Vector4(1, -(px + pos.x), -pos.y, -(pz + pos.z));
-                    
+                    _sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = _sysmemBuffer[positionOffset + i * 3 + 0];
+                    _sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = _sysmemBuffer[positionOffset + i * 3 + 1];
+                    _sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = _sysmemBuffer[positionOffset + i * 3 + 2];
                     
                     // compute the new current frame matrix
-                    m_sysmemBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0,0, 0);
-                    m_sysmemBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0,0, 0);
-                    m_sysmemBuffer[positionOffset + i * 3 + 2] = new Vector4(1, matrices.Src[z].m21,matrices.Src[z].m22, matrices.Src[z].m23);
-
-                    // var a = Matrix4x4.Inverse(matrices.Src[z]);
-
+                    _sysmemBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0,0, 0); 
+                    _sysmemBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0,0, 0);
+                    _sysmemBuffer[positionOffset + i * 3 + 2] = new Vector4(1, _matrices.Src[i].m03,_matrices.Src[i].m13, _matrices.Src[i].m23);
 
                     // compute the new inverse matrix
-                    m_sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(1, 0, 0, 0);
-                    m_sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(1, 0, 0, 0);
-                    m_sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(1, -matrices.Src[z].m21,-matrices.Src[z].m22, -matrices.Src[z].m23);
-                    
-                    // compute the new inverse matrix
-                    // m_sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(a.m00, a.m01, a.m02, a.m03);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(a.m10, a.m11, a.m12, a.m13);
-                    // m_sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(a.m20, a.m21, a.m22, a.m23);
+                    _sysmemBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(1, 0, 0, 0);
+                    _sysmemBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(1, 0, 0, 0);
+                    _sysmemBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(1, -_matrices.Src[i].m03,-_matrices.Src[i].m13, -_matrices.Src[i].m23);
                 }
             }
         }
 
 
-        public unsafe JobHandle OnPerformCulling(
+        private JobHandle OnPerformCulling(
             BatchRendererGroup rendererGroup,
             BatchCullingContext cullingContext,
             BatchCullingOutput cullingOutput,
             IntPtr userContext)
         {
-            if (!m_initialized)
+            if (!_initialized)
             {
                 return new JobHandle();
             }
 
-            BatchCullingOutputDrawCommands drawCommands = new BatchCullingOutputDrawCommands();
+            var drawCommands = new BatchCullingOutputDrawCommands();
 
             drawCommands.drawRangeCount = 1;
             drawCommands.drawRanges = Malloc<BatchDrawRange>(1);
@@ -300,8 +265,8 @@ namespace ThousandAnt.Boids
             };
 
             drawCommands.visibleInstances = Malloc<int>(Size);
-            int n = 0;
-            for (int r = 0; r < Size; r++)
+            var n = 0;
+            for (var r = 0; r < Size; r++)
             {
                 drawCommands.visibleInstances[n++] = r;
             }
@@ -314,9 +279,9 @@ namespace ThousandAnt.Boids
             {
                 visibleOffset = 0,
                 visibleCount = (uint) n,
-                batchID = m_batchID,
-                materialID = m_materialID,
-                meshID = m_meshID,
+                batchID = _batchID,
+                materialID = _materialID,
+                meshID = _meshID,
                 submeshIndex = 0,
                 splitVisibilityMask = 0xff,
                 sortingPosition = 0
@@ -330,7 +295,7 @@ namespace ThousandAnt.Boids
             return new JobHandle();
         }
 
-        private static unsafe T* Malloc<T>(int count) where T : unmanaged
+        private static T* Malloc<T>(int count) where T : unmanaged
         {
             return (T*) UnsafeUtility.Malloc(
                 UnsafeUtility.SizeOf<T>() * count,
@@ -357,42 +322,42 @@ namespace ThousandAnt.Boids
         private void DisposeBoids()
         {
             // Like the GameObjectBoidsRunner - complete all jobs before disabling
-            boidsHandle.Complete();
+            _boidsHandle.Complete();
 
             // Free this memory
-            if (noiseOffsets.IsCreated)
+            if (_noiseOffsets.IsCreated)
             {
-                noiseOffsets.Dispose();
+                _noiseOffsets.Dispose();
             }
 
-            if (centerFlock != null)
+            if (_centerFlock != null)
             {
-                UnsafeUtility.Free(centerFlock, Allocator.Persistent);
-                centerFlock = null;
+                UnsafeUtility.Free(_centerFlock, Allocator.Persistent);
+                _centerFlock = null;
             }
         }
 
         private void DisposeBatchRendererGroup()
         {
-            if (!m_initialized)
+            if (!_initialized)
             {
                 return;
             }
 
-            m_BatchRendererGroup.RemoveBatch(m_batchID);
-            if (Material)
+            _batchRendererGroup.RemoveBatch(_batchID);
+            if (_material)
             {
-                m_BatchRendererGroup.UnregisterMaterial(m_materialID);
+                _batchRendererGroup.UnregisterMaterial(_materialID);
             }
 
-            if (Mesh)
+            if (_mesh)
             {
-                m_BatchRendererGroup.UnregisterMesh(m_meshID);
+                _batchRendererGroup.UnregisterMesh(_meshID);
             }
 
-            m_BatchRendererGroup.Dispose();
-            m_GPUPersistentInstanceData.Dispose();
-            m_sysmemBuffer.Dispose();
+            _batchRendererGroup.Dispose();
+            _gpuPersistentInstanceData.Dispose();
+            _sysmemBuffer.Dispose();
         }
     }
 }
