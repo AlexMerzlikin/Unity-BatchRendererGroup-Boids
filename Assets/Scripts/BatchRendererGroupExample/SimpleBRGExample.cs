@@ -21,7 +21,8 @@ public class SimpleBRGExample : MonoBehaviour
     [SerializeField] private float _motionAmplitude;
     [SerializeField] private Vector3 _position;
     [SerializeField] private Vector3 _motionDirection;
-    
+    [SerializeField] private uint _instancesCount = 1;
+
     private BatchRendererGroup _brg;
     private GraphicsBuffer _instanceData;
     private BatchID _batchID;
@@ -36,7 +37,6 @@ public class SimpleBRGExample : MonoBehaviour
     private const int SizeOfPackedMatrix = sizeof(float) * 4 * 3;
     private const int BytesPerInstance = (SizeOfPackedMatrix * 2);
     private const int ExtraBytes = SizeOfMatrix;
-    private const int NumInstances = 1;
 
     // Raw buffers are allocated in ints, define an utility method to compute the required
     // amount of ints for our data.
@@ -58,7 +58,7 @@ public class SimpleBRGExample : MonoBehaviour
         _materialID = _brg.RegisterMaterial(_material);
 
         // Create the buffer that holds our instance data
-        var bufferCountForInstances = BufferCountForInstances(BytesPerInstance, NumInstances, ExtraBytes);
+        var bufferCountForInstances = BufferCountForInstances(BytesPerInstance, (int) _instancesCount, ExtraBytes);
         _instanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw,
             bufferCountForInstances,
             sizeof(int));
@@ -67,26 +67,34 @@ public class SimpleBRGExample : MonoBehaviour
         var zero = new Matrix4x4[1] { Matrix4x4.zero };
 
         // Create transform matrices for our three example instances
-        var matrices = new float4x4[NumInstances] { Matrix4x4.Translate(_position) };
+        var matrices = new float4x4[_instancesCount];
+        for (var i = 0; i < matrices.Length; i++)
+        {
+            matrices[i] = Matrix4x4.Translate(_position * i);
+        }
 
         // Convert the transform matrices into the packed format expected by the shader
-        _objectToWorld = new float3x4[NumInstances]
+        _objectToWorld = new float3x4[_instancesCount];
+        for (var i = 0; i < _objectToWorld.Length; i++)
         {
-            new(matrices[0].c0.x, matrices[0].c1.x, matrices[0].c2.x, matrices[0].c3.x,
-                matrices[0].c0.y, matrices[0].c1.y, matrices[0].c2.y, matrices[0].c3.y,
-                matrices[0].c0.z, matrices[0].c1.z, matrices[0].c2.z, matrices[0].c3.z
-            )
-        };
+            _objectToWorld[i] = new float3x4(
+                matrices[i].c0.x, matrices[i].c1.x, matrices[i].c2.x, matrices[i].c3.x,
+                matrices[i].c0.y, matrices[i].c1.y, matrices[i].c2.y, matrices[i].c3.y,
+                matrices[i].c0.z, matrices[i].c1.z, matrices[i].c2.z, matrices[i].c3.z
+            );
+        }
 
         // Also create packed inverse matrices
         var inverse = math.inverse(matrices[0]);
-        _worldToObject = new float3x4[NumInstances]
+        _worldToObject = new float3x4[_instancesCount];
+        for (var i = 0; i < _worldToObject.Length; i++)
         {
-            new(inverse.c0.x, inverse.c1.x, inverse.c2.x, inverse.c3.x,
+            _worldToObject[i] = new float3x4(
+                inverse.c0.x, inverse.c1.x, inverse.c2.x, inverse.c3.x,
                 inverse.c0.y, inverse.c1.y, inverse.c2.y, inverse.c3.y,
                 inverse.c0.z, inverse.c1.z, inverse.c2.z, inverse.c3.z
-            )
-        };
+            );
+        }
 
 
         // In this simple example, the instance data is placed into the buffer like this:
@@ -98,7 +106,7 @@ public class SimpleBRGExample : MonoBehaviour
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
         // is expressed as source array elements, so it is easier to work in multiples of sizeof(PackedMatrix).
-        const uint byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * NumInstances;
+        var byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * (uint) _instancesCount;
         // uint byteAddressColor = byteAddressWorldToObject + kSizeOfPackedMatrix * kNumInstances;
 
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
@@ -146,7 +154,7 @@ public class SimpleBRGExample : MonoBehaviour
     private void UpdatePositions(Vector3 pos)
     {
         _instanceData.GetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix), 1);
-        const uint byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * NumInstances;
+        var byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * (uint) _instancesCount;
         _instanceData.GetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix), 1);
         _objectToWorld[0] = new float3x4(
             new float3(_objectToWorld[0].c0.x, _objectToWorld[0].c0.y, _objectToWorld[0].c0.z),
@@ -190,7 +198,7 @@ public class SimpleBRGExample : MonoBehaviour
 
         // Acquire a pointer to the BatchCullingOutputDrawCommands struct so we can easily
         // modify it directly.
-        var drawCommands = (BatchCullingOutputDrawCommands*)cullingOutput.drawCommands.GetUnsafePtr();
+        var drawCommands = (BatchCullingOutputDrawCommands*) cullingOutput.drawCommands.GetUnsafePtr();
 
         // Allocate memory for the output arrays. In a more complicated implementation the amount of memory
         // allocated could be dynamically calculated based on what we determined to be visible.
@@ -200,14 +208,18 @@ public class SimpleBRGExample : MonoBehaviour
         // - a single draw range (which covers our single draw command)
         // - kNumInstances visible instance indices.
         // The arrays must always be allocated using Allocator.TempJob.
-        drawCommands->drawCommands = (BatchDrawCommand*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawCommand>(), alignment, Allocator.TempJob);
-        drawCommands->drawRanges = (BatchDrawRange*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawRange>(), alignment, Allocator.TempJob);
-        drawCommands->visibleInstances = (int*)UnsafeUtility.Malloc(NumInstances * sizeof(int), alignment, Allocator.TempJob);
+        drawCommands->drawCommands = (BatchDrawCommand*) UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawCommand>(),
+            alignment, Allocator.TempJob);
+        drawCommands->drawRanges =
+            (BatchDrawRange*) UnsafeUtility.Malloc(UnsafeUtility.SizeOf<BatchDrawRange>(), alignment,
+                Allocator.TempJob);
+        drawCommands->visibleInstances =
+            (int*) UnsafeUtility.Malloc(_instancesCount * sizeof(int), alignment, Allocator.TempJob);
         drawCommands->drawCommandPickingInstanceIDs = null;
 
         drawCommands->drawCommandCount = 1;
         drawCommands->drawRangeCount = 1;
-        drawCommands->visibleInstanceCount = NumInstances;
+        drawCommands->visibleInstanceCount = (int) _instancesCount;
 
         // Our example does not use depth sorting, so we can leave the instanceSortingPositions as null.
         drawCommands->instanceSortingPositions = null;
@@ -217,7 +229,7 @@ public class SimpleBRGExample : MonoBehaviour
         // starting from offset 0 in the array, using the batch, material and mesh
         // IDs that we registered in the Start() method. No special flags are set.
         drawCommands->drawCommands[0].visibleOffset = 0;
-        drawCommands->drawCommands[0].visibleCount = NumInstances;
+        drawCommands->drawCommands[0].visibleCount = _instancesCount;
         drawCommands->drawCommands[0].batchID = _batchID;
         drawCommands->drawCommands[0].materialID = _materialID;
         drawCommands->drawCommands[0].meshID = _meshID;
@@ -238,7 +250,7 @@ public class SimpleBRGExample : MonoBehaviour
         // Finally, write the actual visible instance indices to their array. In a more complicated
         // implementation, this output would depend on what we determined to be visible, but in this example
         // we will just assume that everything is visible.
-        for (var i = 0; i < NumInstances; ++i)
+        for (var i = 0; i < _instancesCount; ++i)
         {
             drawCommands->visibleInstances[i] = i;
         }
