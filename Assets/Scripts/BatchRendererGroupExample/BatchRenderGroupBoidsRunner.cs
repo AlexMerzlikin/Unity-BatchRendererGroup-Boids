@@ -60,18 +60,16 @@ namespace BatchRendererGroupExample
 
             // Batch metadata buffer
             var objectToWorldID = Shader.PropertyToID("unity_ObjectToWorld");
-            // var matrixPreviousMID = Shader.PropertyToID("unity_MatrixPreviousM");
             var worldToObjectID = Shader.PropertyToID("unity_WorldToObject");
-            var colorID = Shader.PropertyToID("_BaseColor");
 
             // Generate a grid of objects...
             var bigDataBufferVector4Count = 4 + Size * (2 * 3); // 4xfloat4 zero + per instance = { 3x mat4x3, 1x float4 color }
             _dataBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
             _gpuPersistentInstanceData =
-                new GraphicsBuffer(GraphicsBuffer.Target.Raw, (int) bigDataBufferVector4Count * 16 / 4, 4);
+                new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
 
             // 64 bytes of zeroes, so loads from address 0 return zeroes. This is a BatchRendererGroup convention.
-            const int positionOffset = 4;
+            const int positionOffset = 4 * 4 * sizeof(float);
             _dataBuffer[0] = new Vector4(0, 0, 0, 0);
             _dataBuffer[1] = new Vector4(0, 0, 0, 0);
             _dataBuffer[2] = new Vector4(0, 0, 0, 0);
@@ -81,28 +79,12 @@ namespace BatchRendererGroupExample
             try
             {
                 UpdatePositions();
-                // Colors
-                // var colorOffset = positionOffset + Size * 3 * 3;
-                // for (var i = 0; i < Size; i++)
-                // {
-                //     var col = Color.HSVToRGB((i / (float) Size) % 1.0f, 1.0f, 1.0f);
-                //
-                //     // write colors right after the 4x3 matrices
-                //     _dataBuffer[colorOffset + i] = new Vector4(col.r, col.g, col.b, 1.0f);
-                // }
-
                 _gpuPersistentInstanceData.SetData(_dataBuffer);
-
                 var batchMetadata =
                     new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
                     {
-                        [0] = CreateMetadataValue(objectToWorldID, 64, true),
-                        // [1] = CreateMetadataValue(matrixPreviousMID, 64 + Size * UnsafeUtility.SizeOf<Vector4>() * 3,
-                            // true),
-                        [1] = CreateMetadataValue(worldToObjectID,
-                            64 + Size * UnsafeUtility.SizeOf<Vector4>() * 2,
-                            true),
-                        // [2] = CreateMetadataValue(colorID, 64 + Size * UnsafeUtility.SizeOf<Vector4>() * 3 * 2, true)
+                        [0] = CreateMetadataValue(objectToWorldID, positionOffset, true),
+                        [1] = CreateMetadataValue(worldToObjectID, positionOffset + Size * UnsafeUtility.SizeOf<Vector4>() * 2, true),
                     };
 
                 // Register batch
@@ -126,8 +108,9 @@ namespace BatchRendererGroupExample
 
             for (var i = 0; i < Size; i++)
             {
-                var pos = transform.position + Random.insideUnitSphere * Radius;
-                var rotation = Quaternion.Slerp(transform.rotation, Random.rotation, 0.3f);
+                var currentTransform = transform;
+                var pos = currentTransform.position + Random.insideUnitSphere * Radius;
+                var rotation = Quaternion.Slerp(currentTransform.rotation, Random.rotation, 0.3f);
                 _noiseOffsets[i] = Random.value * 10f;
                 _matrices.Src[i] = Matrix4x4.TRS(pos, rotation, Vector3.one);
 
@@ -161,18 +144,6 @@ namespace BatchRendererGroupExample
                 UpdatePositions();
                 // upload the full buffer
                 _gpuPersistentInstanceData.SetData(_dataBuffer);
-                // for (int i = 0; i < Mesh.subMeshCount; i++)
-                // {
-                //     // Draw all elements, because we use a pinned array, the pointer is
-                //     // representative of the array.
-                //     Graphics.DrawMeshInstanced(
-                //         Mesh,
-                //         i,
-                //         Material,
-                //         matrices.Src, // Matrices.Src is an array (Matrix4x4[])
-                //         matrices.Src.Length,
-                //         tempBlock);
-                // }
 
                 var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
                 {
@@ -181,7 +152,7 @@ namespace BatchRendererGroupExample
                     Size = _matrices.Size
                 }.Schedule();
 
-                var boidJob = new BoidsPointerOnly.BatchedBoidJob
+                var boidsJob = new BoidsPointerOnly.BatchedBoidJob
                 {
                     Weights = Weights,
                     Goal = Destination.position,
@@ -196,7 +167,7 @@ namespace BatchRendererGroupExample
                     Dst = _matrices.DstPtr,
                 }.Schedule(_matrices.Size, 32);
 
-                var combinedJob = JobHandle.CombineDependencies(boidJob, avgCenterJob);
+                var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob);
 
                 _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
                 {
@@ -218,21 +189,6 @@ namespace BatchRendererGroupExample
             for (var i = 0; i < Size; i++)
             {
                 {
-                    /*
-                     *  mat4x3 packed like this:
-                     *
-                            float4x4(
-                                    p1.x, p1.w, p2.z, p3.y,
-                                    p1.y, p2.x, p2.w, p3.z,
-                                    p1.z, p2.y, p3.x, p3.w,
-                                    0.0, 0.0, 0.0, 1.0
-                                );
-                    */
-
-                    // _dataBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = _dataBuffer[positionOffset + i * 3 + 0];
-                    // _dataBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = _dataBuffer[positionOffset + i * 3 + 1];
-                    // _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = _dataBuffer[positionOffset + i * 3 + 2];
-                    //
                     // compute the new current frame matrix
                     _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0,0, 0); 
                     _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0,0, 0);
