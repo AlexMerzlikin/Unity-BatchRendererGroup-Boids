@@ -76,25 +76,19 @@ namespace BatchRendererGroupExample
             _dataBuffer[3] = new Vector4(0, 0, 0, 0);
 
             // Matrices
-            try
-            {
-                UpdatePositions();
-                _gpuPersistentInstanceData.SetData(_dataBuffer);
-                var batchMetadata =
-                    new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
-                    {
-                        [0] = CreateMetadataValue(objectToWorldID, positionOffset, true),
-                        [1] = CreateMetadataValue(worldToObjectID, positionOffset + Size * UnsafeUtility.SizeOf<Vector4>() * 2, true),
-                    };
+            UpdatePositions();
+            _gpuPersistentInstanceData.SetData(_dataBuffer);
+            var batchMetadata =
+                new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
+                {
+                    [0] = CreateMetadataValue(objectToWorldID, positionOffset, true),
+                    [1] = CreateMetadataValue(worldToObjectID,
+                        positionOffset + Size * UnsafeUtility.SizeOf<Vector4>() * 2, true),
+                };
 
-                // Register batch
-                _batchID = _batchRendererGroup.AddBatch(batchMetadata, _gpuPersistentInstanceData.bufferHandle);
+            // Register batch
+            _batchID = _batchRendererGroup.AddBatch(batchMetadata, _gpuPersistentInstanceData.bufferHandle);
 
-            }
-            catch (Exception e)
-            {
-                Debug.Log($"{nameof(BatchRenderGroupBoidsRunner)}: {e}");
-            }
 
             _initialized = true;
         }
@@ -135,69 +129,64 @@ namespace BatchRendererGroupExample
         private void Update()
         {
             // Complete all jobs at the start of the frame.
-            try
+            _boidsHandle.Complete();
+            // Set up the transform so that we have cinemachine to look at
+            transform.position = *_centerFlock;
+
+            UpdatePositions();
+            // upload the full buffer
+            _gpuPersistentInstanceData.SetData(_dataBuffer);
+
+            var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
             {
-                _boidsHandle.Complete();
-                // Set up the transform so that we have cinemachine to look at
-                transform.position = *_centerFlock;
+                Matrices = _matrices.SrcPtr,
+                Center = _centerFlock,
+                Size = _matrices.Size
+            }.Schedule();
 
-                UpdatePositions();
-                // upload the full buffer
-                _gpuPersistentInstanceData.SetData(_dataBuffer);
-
-                var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
-                {
-                    Matrices = _matrices.SrcPtr,
-                    Center = _centerFlock,
-                    Size = _matrices.Size
-                }.Schedule();
-
-                var boidsJob = new BoidsPointerOnly.BatchedBoidJob
-                {
-                    Weights = Weights,
-                    Goal = Destination.position,
-                    NoiseOffsets = _noiseOffsets,
-                    Time = Time.time,
-                    DeltaTime = Time.deltaTime,
-                    MaxDist = SeparationDistance,
-                    Speed = MaxSpeed,
-                    RotationSpeed = RotationSpeed,
-                    Size = _matrices.Size,
-                    Src = _matrices.SrcPtr,
-                    Dst = _matrices.DstPtr,
-                }.Schedule(_matrices.Size, 32);
-
-                var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob);
-
-                _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
-                {
-                    Dst = _matrices.SrcPtr,
-                    Src = _matrices.DstPtr
-                }.Schedule(_matrices.Size, 32, combinedJob);
-            }
-            catch (Exception e)
+            var boidsJob = new BoidsPointerOnly.BatchedBoidJob
             {
-                Debug.Log($"{nameof(BatchRenderGroupBoidsRunner)}: {e}");
-            }
+                Weights = Weights,
+                Goal = Destination.position,
+                NoiseOffsets = _noiseOffsets,
+                Time = Time.time,
+                DeltaTime = Time.deltaTime,
+                MaxDist = SeparationDistance,
+                Speed = MaxSpeed,
+                RotationSpeed = RotationSpeed,
+                Size = _matrices.Size,
+                Src = _matrices.SrcPtr,
+                Dst = _matrices.DstPtr,
+            }.Schedule(_matrices.Size, 32);
+
+            var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob);
+
+            _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
+            {
+                Dst = _matrices.SrcPtr,
+                Src = _matrices.DstPtr
+            }.Schedule(_matrices.Size, 32, combinedJob);
         }
 
         private void UpdatePositions()
         {
             const int positionOffset = 4;
-            var itemCountOffset = 6; // 3xfloat4 per matrix
+            var itemCountOffset = 3 * Size; // 3xfloat4 per matrix
 
             for (var i = 0; i < Size; i++)
             {
                 {
                     // compute the new current frame matrix
-                    _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0,0, 0); 
-                    _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0,0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 2] = new Vector4(1, _matrices.Src[i].m03,_matrices.Src[i].m13, _matrices.Src[i].m23);
+                    _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0, 0, 0);
+                    _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0, 0, 0);
+                    _dataBuffer[positionOffset + i * 3 + 2] = new Vector4(1, _matrices.Src[i].m03, _matrices.Src[i].m13,
+                        _matrices.Src[i].m23);
 
                     // compute the new inverse matrix
                     _dataBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(1, 0, 0, 0);
                     _dataBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(1, 0, 0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(1, -_matrices.Src[i].m03,-_matrices.Src[i].m13, -_matrices.Src[i].m23);
+                    _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(1, -_matrices.Src[i].m03,
+                        -_matrices.Src[i].m13, -_matrices.Src[i].m23);
                 }
             }
         }
