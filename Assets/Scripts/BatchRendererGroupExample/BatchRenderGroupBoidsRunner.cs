@@ -177,16 +177,15 @@ namespace BatchRendererGroupExample
             {
                 {
                     // compute the new current frame matrix
-                    _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(1, 0, 0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(1, 0, 0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 2] = new Vector4(1, _matrices.Src[i].m03, _matrices.Src[i].m13,
-                        _matrices.Src[i].m23);
+                    _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(_matrices.Src[i].m00, _matrices.Src[i].m10, _matrices.Src[i].m20, _matrices.Src[i].m01);
+                    _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(_matrices.Src[i].m11, _matrices.Src[i].m21, _matrices.Src[i].m02, _matrices.Src[i].m12);
+                    _dataBuffer[positionOffset + i * 3 + 2] = new Vector4(_matrices.Src[i].m22, _matrices.Src[i].m03, _matrices.Src[i].m13, _matrices.Src[i].m23);
 
                     // compute the new inverse matrix
-                    _dataBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(1, 0, 0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(1, 0, 0, 0);
-                    _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(1, -_matrices.Src[i].m03,
-                        -_matrices.Src[i].m13, -_matrices.Src[i].m23);
+                    var inverse = Matrix4x4.Inverse(_matrices.Src[i]);
+                    _dataBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(inverse.m00, inverse.m10, inverse.m20, inverse.m01);
+                    _dataBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(inverse.m11, inverse.m21, inverse.m02, inverse.m12);
+                    _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(inverse.m22, inverse.m03, inverse.m13, inverse.m23);
                 }
             }
         }
