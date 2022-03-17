@@ -5,6 +5,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Random = UnityEngine.Random;
 
 // This example demonstrates how to write a very minimal BatchRendererGroup
 // based custom renderer using the Universal Render Pipeline to help
@@ -19,9 +20,9 @@ public class SimpleBRGExample : MonoBehaviour
     [SerializeField] private Material _material;
     [SerializeField] private float _motionSpeed;
     [SerializeField] private float _motionAmplitude;
-    [SerializeField] private Vector3 _position;
     [SerializeField] private Vector3 _motionDirection;
     [SerializeField] private uint _instancesCount = 1;
+    [SerializeField] private float _radius;
 
     private BatchRendererGroup _brg;
     private GraphicsBuffer _instanceData;
@@ -31,6 +32,7 @@ public class SimpleBRGExample : MonoBehaviour
     private float _phase;
     private float3x4[] _objectToWorld;
     private float3x4[] _worldToObject;
+    private uint _byteAddressWorldToObject;
 
     // Some helper constants to make calculations later a bit more convenient.
     private const int SizeOfMatrix = sizeof(float) * 4 * 4;
@@ -70,7 +72,7 @@ public class SimpleBRGExample : MonoBehaviour
         var matrices = new float4x4[_instancesCount];
         for (var i = 0; i < matrices.Length; i++)
         {
-            matrices[i] = Matrix4x4.Translate(_position * i);
+            matrices[i] = Matrix4x4.Translate(Random.onUnitSphere * _radius);
         }
 
         // Convert the transform matrices into the packed format expected by the shader
@@ -106,16 +108,14 @@ public class SimpleBRGExample : MonoBehaviour
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
         // is expressed as source array elements, so it is easier to work in multiples of sizeof(PackedMatrix).
-        var byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * (uint) _instancesCount;
-        // uint byteAddressColor = byteAddressWorldToObject + kSizeOfPackedMatrix * kNumInstances;
+        _byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * _instancesCount;
 
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
         _instanceData.SetData(zero, 0, 0, 1);
         _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
             _objectToWorld.Length);
-        _instanceData.SetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix),
+        _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),
             _worldToObject.Length);
-        // m_InstanceData.SetData(colors, 0, (int)(byteAddressColor / kSizeOfFloat4), colors.Length);
 
         // Set up metadata values to point to the instance data. Set the most significant bit 0x80000000 in each,
         // which instructs the shader that the data is an array with one value per instance, indexed by the instance index.
@@ -133,7 +133,7 @@ public class SimpleBRGExample : MonoBehaviour
             [1] = new MetadataValue
             {
                 NameID = Shader.PropertyToID("unity_WorldToObject"),
-                Value = 0x80000000 | byteAddressWorldToObject,
+                Value = 0x80000000 | _byteAddressWorldToObject,
             }
         };
 
@@ -153,24 +153,26 @@ public class SimpleBRGExample : MonoBehaviour
 
     private void UpdatePositions(Vector3 pos)
     {
-        _instanceData.GetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix), 1);
-        var byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * (uint) _instancesCount;
-        _instanceData.GetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix), 1);
-        _objectToWorld[0] = new float3x4(
-            new float3(_objectToWorld[0].c0.x, _objectToWorld[0].c0.y, _objectToWorld[0].c0.z),
-            new float3(_objectToWorld[0].c1.x, _objectToWorld[0].c1.y, _objectToWorld[0].c1.z),
-            new float3(_objectToWorld[0].c2.x, _objectToWorld[0].c2.y, _objectToWorld[0].c2.z),
-            new float3(_objectToWorld[0].c3.x + pos.x, _objectToWorld[0].c3.y + pos.y, _objectToWorld[0].c3.z + pos.z)
-        );
-        _worldToObject[0] = new float3x4(
-            new float3(_worldToObject[0].c0.x, _worldToObject[0].c0.y, _worldToObject[0].c0.z),
-            new float3(_worldToObject[0].c1.x, _worldToObject[0].c1.y, _worldToObject[0].c1.z),
-            new float3(_worldToObject[0].c2.x, _worldToObject[0].c2.y, _worldToObject[0].c2.z),
-            new float3(_worldToObject[0].c3.x - pos.x, _worldToObject[0].c3.y - pos.y, _worldToObject[0].c3.z - pos.z)
-        );
+        for (var i = 0; i < _instancesCount; i++)
+        {
+            _objectToWorld[i] = new float3x4(
+                new float3(_objectToWorld[i].c0.x, _objectToWorld[i].c0.y, _objectToWorld[i].c0.z),
+                new float3(_objectToWorld[i].c1.x, _objectToWorld[i].c1.y, _objectToWorld[i].c1.z),
+                new float3(_objectToWorld[i].c2.x, _objectToWorld[i].c2.y, _objectToWorld[i].c2.z),
+                new float3(_objectToWorld[i].c3.x + pos.x, _objectToWorld[i].c3.y + pos.y,
+                    _objectToWorld[i].c3.z + pos.z));
+
+            _worldToObject[i] = new float3x4(
+                new float3(_worldToObject[i].c0.x, _worldToObject[i].c0.y, _worldToObject[i].c0.z),
+                new float3(_worldToObject[i].c1.x, _worldToObject[i].c1.y, _worldToObject[i].c1.z),
+                new float3(_worldToObject[i].c2.x, _worldToObject[i].c2.y, _worldToObject[i].c2.z),
+                new float3(_worldToObject[i].c3.x - pos.x, _worldToObject[i].c3.y - pos.y,
+                    _worldToObject[i].c3.z - pos.z));
+        }
+
         _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
             _objectToWorld.Length);
-        _instanceData.SetData(_worldToObject, 0, (int) (byteAddressWorldToObject / SizeOfPackedMatrix),
+        _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),
             _worldToObject.Length);
     }
 
