@@ -87,10 +87,10 @@ public class SimpleBRGExample : MonoBehaviour
         }
 
         // Also create packed inverse matrices
-        var inverse = math.inverse(matrices[0]);
         _worldToObject = new float3x4[_instancesCount];
         for (var i = 0; i < _worldToObject.Length; i++)
         {
+            var inverse = math.inverse(matrices[i]);
             _worldToObject[i] = new float3x4(
                 inverse.c0.x, inverse.c1.x, inverse.c2.x, inverse.c3.x,
                 inverse.c0.y, inverse.c1.y, inverse.c2.y, inverse.c3.y,
@@ -98,12 +98,12 @@ public class SimpleBRGExample : MonoBehaviour
             );
         }
 
-
         // In this simple example, the instance data is placed into the buffer like this:
         // Offset | Description
         //      0 | 64 bytes of zeroes, so loads from address 0 return zeroes
-        //     64 | unity_ObjectToWorld, three packed float3x4 matrices
-        //    112 | unity_WorldToObject, three packed float3x4 matrices
+        //     64 | 32 uninitialized bytes to make working with SetData easier, otherwise unnecessary
+        //     96 | unity_ObjectToWorld, three packed float3x4 matrices
+        //    144 | unity_WorldToObject, three packed float3x4 matrices
 
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
