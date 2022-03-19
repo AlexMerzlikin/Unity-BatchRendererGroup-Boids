@@ -116,7 +116,7 @@ namespace BatchRendererGroupExample
                 Size = _matrices.Size
             }.Schedule();
 
-            var boidsJob = new BoidsPointerOnlyCopyToFloat4.BatchedBoidJob
+            var boidsJob = new BoidsPointerOnlyCopyToFloat4.BatchedBoidsJob
             {
                 Weights = Weights,
                 Goal = Destination.position,

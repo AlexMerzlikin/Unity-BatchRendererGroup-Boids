@@ -22,13 +22,13 @@ namespace ThousandAnt.Boids
             public void Execute()
             {
                 var center = float3.zero;
-                for (int i = 0; i < Size; i++)
+                for (var i = 0; i < Size; i++)
                 {
-                    float4x4 m = Matrices[i];
+                    var m = Matrices[i];
                     center += m.Position();
                 }
 
-                *Center = center /= Size;
+                *Center = center / Size;
             }
         }
 
@@ -48,7 +48,7 @@ namespace ThousandAnt.Boids
         }
 
         [BurstCompile]
-        public struct BatchedBoidJob : IJobParallelFor
+        public struct BatchedBoidsJob : IJobParallelFor
         {
             public BoidWeights Weights;
             public float Time;
@@ -74,7 +74,7 @@ namespace ThousandAnt.Boids
 
             public void Execute(int index)
             {
-                float4x4 current = Src[index];
+                var current = Src[index];
                 var currentPos = current.Position();
                 var perceivedSize = Size - 1;
 
@@ -83,14 +83,14 @@ namespace ThousandAnt.Boids
                 var cohesion = float3.zero;
                 var tendency = math.normalizesafe(Goal - currentPos) * Weights.TendencyWeight;
 
-                for (int i = 0; i < Size; i++)
+                for (var i = 0; i < Size; i++)
                 {
                     if (i == index)
                     {
                         continue;
                     }
 
-                    float4x4 b = Src[i];
+                    var b = Src[i];
                     var other = b.Position();
 
                     // Perform separation
