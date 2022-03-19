@@ -329,15 +329,13 @@ MonoBehaviour:
     AlignmentWeight: 1
     NoiseWeight: 1
   SeparationDistance: 10
-  Radius: 100
-  Size: 10
+  Radius: 200
+  Size: 5000
   MaxSpeed: 6
   RotationSpeed: 4
   Destination: {fileID: 1714512844}
   _mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   _material: {fileID: 2100000, guid: f77bc72a8bd44bc49be057c196b03b2b, type: 2}
-  _initial: {r: 0, g: 0, b: 0, a: 0}
-  _final: {r: 0, g: 0, b: 0, a: 0}
 --- !u!4 &909115856
 Transform:
   m_ObjectHideFlags: 0
@@ -465,34 +463,15 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 33, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -30}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &961739756
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 961739749}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 097ea2ce0d654181915a091c381e35a3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  _material: {fileID: 2100000, guid: f77bc72a8bd44bc49be057c196b03b2b, type: 2}
-  _motionSpeed: 5
-  _motionAmplitude: 0.05
-  _position: {x: 2, y: 0, z: 0}
-  _motionDirection: {x: 1, y: 1, z: 1}
-  _instancesCount: 20
---- !u!114 &961739757
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -501,18 +480,34 @@ MonoBehaviour:
   m_GameObject: {fileID: 961739749}
   m_Enabled: 0
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 281db361300e4dc9b1174b38a72fb93b, type: 3}
+  m_Script: {fileID: 11500000, guid: 097ea2ce0d654181915a091c381e35a3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  m_material: {fileID: 2100000, guid: f77bc72a8bd44bc49be057c196b03b2b, type: 2}
-  m_cullTest: 0
-  m_motionVectorTest: 1
-  m_center: {x: 0, y: 0, z: 0}
-  m_motionSpeed: 3
-  m_motionAmplitude: 2
-  m_spacingFactor: 1
-  itemGridSize: 4
+  _mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  _material: {fileID: 2100000, guid: f77bc72a8bd44bc49be057c196b03b2b, type: 2}
+  _motionSpeed: 1
+  _motionAmplitude: 0.05
+  _motionDirection: {x: 2, y: 2, z: 0}
+  _instancesCount: 190
+  _radius: 10
+--- !u!114 &961739757
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 961739749}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7bad99df8c384725b49fc90797ed9d81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _prefab: {fileID: 1803953977822841084, guid: 0a82948425b100e4ebad433d42d622aa, type: 3}
+  _motionSpeed: 1
+  _motionAmplitude: 0.05
+  _motionDirection: {x: 2, y: 2, z: 0}
+  _instancesCount: 190
+  _radius: 10
 --- !u!1 &1160234425
 GameObject:
   m_ObjectHideFlags: 0
@@ -627,8 +622,8 @@ MonoBehaviour:
     TendencyWeight: 1
     AlignmentWeight: 1
     NoiseWeight: 1
-  SeparationDistance: 10
-  Radius: 100
+  SeparationDistance: 50
+  Radius: 500
   Size: 5000
   MaxSpeed: 6
   RotationSpeed: 4
