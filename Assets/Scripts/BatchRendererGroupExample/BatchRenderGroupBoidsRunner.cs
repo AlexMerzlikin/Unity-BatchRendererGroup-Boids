@@ -63,14 +63,13 @@ namespace BatchRendererGroupExample
             _gpuPersistentInstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
 
             // 64 bytes of zeroes, so loads from address 0 return zeroes. This is a BatchRendererGroup convention.
-            const int positionOffset = 4 * 4 * sizeof(float);
             _dataBuffer[0] = new Vector4(0, 0, 0, 0);
             _dataBuffer[1] = new Vector4(0, 0, 0, 0);
             _dataBuffer[2] = new Vector4(0, 0, 0, 0);
             _dataBuffer[3] = new Vector4(0, 0, 0, 0);
 
             // Matrices
-            UpdatePositions();
+            const int positionOffset = 4 * 4 * sizeof(float);
             _gpuPersistentInstanceData.SetData(_dataBuffer);
             var batchMetadata =
                 new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
@@ -116,19 +115,16 @@ namespace BatchRendererGroupExample
             _boidsHandle.Complete();
             // Set up the transform so that we have cinemachine to look at
             transform.position = *_centerFlock;
-
-            UpdatePositions();
-            // upload the full buffer
             _gpuPersistentInstanceData.SetData(_dataBuffer);
 
-            var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
+            var avgCenterJob = new BoidsPointerOnlyCopyToFloat4.AverageCenterJob
             {
                 Matrices = _matrices.SrcPtr,
                 Center = _centerFlock,
                 Size = _matrices.Size
             }.Schedule();
 
-            var boidsJob = new BoidsPointerOnly.BatchedBoidJob
+            var boidsJob = new BoidsPointerOnlyCopyToFloat4.BatchedBoidJob
             {
                 Weights = Weights,
                 Goal = Destination.position,
@@ -141,39 +137,17 @@ namespace BatchRendererGroupExample
                 Size = _matrices.Size,
                 Src = _matrices.SrcPtr,
                 Dst = _matrices.DstPtr,
+                DataBuffer = _dataBuffer
             }.Schedule(_matrices.Size, 32);
 
             var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob);
 
-            _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
+            _boidsHandle = new BoidsPointerOnlyCopyToFloat4.CopyMatrixJob
             {
                 Dst = _matrices.SrcPtr,
                 Src = _matrices.DstPtr
             }.Schedule(_matrices.Size, 32, combinedJob);
         }
-
-        private void UpdatePositions()
-        {
-            const int positionOffset = 4;
-            var itemCountOffset = 3 * Size; // 3xfloat4 per matrix
-
-            for (var i = 0; i < Size; i++)
-            {
-                {
-                    // compute the new current frame matrix
-                    _dataBuffer[positionOffset + i * 3 + 0] = new Vector4(_matrices.Src[i].m00, _matrices.Src[i].m10, _matrices.Src[i].m20, _matrices.Src[i].m01);
-                    _dataBuffer[positionOffset + i * 3 + 1] = new Vector4(_matrices.Src[i].m11, _matrices.Src[i].m21, _matrices.Src[i].m02, _matrices.Src[i].m12);
-                    _dataBuffer[positionOffset + i * 3 + 2] = new Vector4(_matrices.Src[i].m22, _matrices.Src[i].m03, _matrices.Src[i].m13, _matrices.Src[i].m23);
-
-                    // compute the new inverse matrix
-                    var inverse = Matrix4x4.Inverse(_matrices.Src[i]);
-                    _dataBuffer[positionOffset + i * 3 + 0 + itemCountOffset] = new Vector4(inverse.m00, inverse.m10, inverse.m20, inverse.m01);
-                    _dataBuffer[positionOffset + i * 3 + 1 + itemCountOffset] = new Vector4(inverse.m11, inverse.m21, inverse.m02, inverse.m12);
-                    _dataBuffer[positionOffset + i * 3 + 2 + itemCountOffset] = new Vector4(inverse.m22, inverse.m03, inverse.m13, inverse.m23);
-                }
-            }
-        }
-
 
         private JobHandle OnPerformCulling(
             BatchRendererGroup rendererGroup,
