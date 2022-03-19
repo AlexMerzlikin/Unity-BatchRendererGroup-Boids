@@ -311,7 +311,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &909115855
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -329,8 +329,8 @@ MonoBehaviour:
     AlignmentWeight: 1
     NoiseWeight: 1
   SeparationDistance: 10
-  Radius: 200
-  Size: 5000
+  Radius: 100
+  Size: 100
   MaxSpeed: 6
   RotationSpeed: 4
   Destination: {fileID: 1714512844}
@@ -488,8 +488,8 @@ MonoBehaviour:
   _motionSpeed: 1
   _motionAmplitude: 0.05
   _motionDirection: {x: 2, y: 2, z: 0}
-  _instancesCount: 190
-  _radius: 10
+  _instancesCount: 1000000
+  _radius: 100
 --- !u!114 &961739757
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -497,7 +497,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7bad99df8c384725b49fc90797ed9d81, type: 3}
   m_Name: 
@@ -506,8 +506,8 @@ MonoBehaviour:
   _motionSpeed: 1
   _motionAmplitude: 0.05
   _motionDirection: {x: 2, y: 2, z: 0}
-  _instancesCount: 190
-  _radius: 10
+  _instancesCount: 1000000
+  _radius: 100
 --- !u!1 &1160234425
 GameObject:
   m_ObjectHideFlags: 0
@@ -624,7 +624,7 @@ MonoBehaviour:
     NoiseWeight: 1
   SeparationDistance: 50
   Radius: 500
-  Size: 5000
+  Size: 1000
   MaxSpeed: 6
   RotationSpeed: 4
   Destination: {fileID: 1714512844}
@@ -650,15 +650,15 @@ MonoBehaviour:
     TendencyWeight: 1
     AlignmentWeight: 1
     NoiseWeight: 1
-  SeparationDistance: 10
-  Radius: 20
-  Size: 2
+  SeparationDistance: 50
+  Radius: 500
+  Size: 1000
   MaxSpeed: 6
   RotationSpeed: 4
   Destination: {fileID: 1714512844}
   FlockMember: {fileID: 1803953977822841084, guid: 0a82948425b100e4ebad433d42d622aa,
     type: 3}
-  UseSingleThread: 1
+  UseSingleThread: 0
 --- !u!4 &2040342134
 Transform:
   m_ObjectHideFlags: 0
