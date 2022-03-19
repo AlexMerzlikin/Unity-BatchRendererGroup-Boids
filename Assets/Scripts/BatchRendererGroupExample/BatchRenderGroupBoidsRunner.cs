@@ -14,16 +14,11 @@ namespace BatchRendererGroupExample
     {
         [SerializeField] private Mesh _mesh;
         [SerializeField] private Material _material;
-        [SerializeField] private Color _initial;
-        [SerializeField] private Color _final;
 
-        private MaterialPropertyBlock _tempBlock;
         private PinnedMatrixArray _matrices;
         private NativeArray<float> _noiseOffsets;
         private float3* _centerFlock;
         private JobHandle _boidsHandle;
-        private Vector4[] _colors;
-        private static readonly int ColorProperty = Shader.PropertyToID("_Color");
 
         private BatchRendererGroup _batchRendererGroup;
         private GraphicsBuffer _gpuPersistentInstanceData;
@@ -65,8 +60,7 @@ namespace BatchRendererGroupExample
             // Generate a grid of objects...
             var bigDataBufferVector4Count = 4 + Size * (2 * 3); // 4xfloat4 zero + per instance = { 3x mat4x3, 1x float4 color }
             _dataBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
-            _gpuPersistentInstanceData =
-                new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
+            _gpuPersistentInstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
 
             // 64 bytes of zeroes, so loads from address 0 return zeroes. This is a BatchRendererGroup convention.
             const int positionOffset = 4 * 4 * sizeof(float);
@@ -95,10 +89,8 @@ namespace BatchRendererGroupExample
 
         private void InitBoids()
         {
-            _tempBlock = new MaterialPropertyBlock();
             _matrices = new PinnedMatrixArray(Size);
             _noiseOffsets = new NativeArray<float>(Size, Allocator.Persistent);
-            _colors = new Vector4[Size];
 
             for (var i = 0; i < Size; i++)
             {
@@ -107,15 +99,7 @@ namespace BatchRendererGroupExample
                 var rotation = Quaternion.Slerp(currentTransform.rotation, Random.rotation, 0.3f);
                 _noiseOffsets[i] = Random.value * 10f;
                 _matrices.Src[i] = Matrix4x4.TRS(pos, rotation, Vector3.one);
-
-                _colors[i] = new Color(
-                    Random.Range(_initial.r, _final.r),
-                    Random.Range(_initial.b, _final.b),
-                    Random.Range(_initial.g, _final.g),
-                    Random.Range(_initial.a, _final.a));
             }
-
-            _tempBlock.SetVectorArray(ColorProperty, _colors);
 
             _centerFlock = (float3*) UnsafeUtility.Malloc(
                 UnsafeUtility.SizeOf<float3>(),
