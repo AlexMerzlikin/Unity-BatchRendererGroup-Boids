@@ -37,12 +37,9 @@ namespace BatchRendererGroupExample
         private void InitBatchRendererGroup()
         {
             _batchRendererGroup = new BatchRendererGroup(OnPerformCulling, IntPtr.Zero);
-
-            // Bounds
             var bounds = new Bounds(new Vector3(0, 0, 0), new Vector3(1048576.0f, 1048576.0f, 1048576.0f));
             _batchRendererGroup.SetGlobalBounds(bounds);
 
-            // Register mesh and material
             if (_mesh)
             {
                 _meshID = _batchRendererGroup.RegisterMesh(_mesh);
@@ -53,12 +50,11 @@ namespace BatchRendererGroupExample
                 _materialID = _batchRendererGroup.RegisterMaterial(_material);
             }
 
-            // Batch metadata buffer
             var objectToWorldID = Shader.PropertyToID("unity_ObjectToWorld");
             var worldToObjectID = Shader.PropertyToID("unity_WorldToObject");
 
-            // Generate a grid of objects...
-            var bigDataBufferVector4Count = 4 + Size * (2 * 3); // 4xfloat4 zero + per instance = { 3x mat4x3, 1x float4 color }
+            // float4x4.zero + per instance = { 2 * float3x4 }
+            var bigDataBufferVector4Count = 4 + Size * (2 * 3); 
             _dataBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
             _gpuPersistentInstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
 
@@ -68,7 +64,6 @@ namespace BatchRendererGroupExample
             _dataBuffer[2] = new Vector4(0, 0, 0, 0);
             _dataBuffer[3] = new Vector4(0, 0, 0, 0);
 
-            // Matrices
             const int positionOffset = 4 * 4 * sizeof(float);
             _gpuPersistentInstanceData.SetData(_dataBuffer);
             var batchMetadata =
@@ -79,7 +74,6 @@ namespace BatchRendererGroupExample
                         positionOffset + Size * UnsafeUtility.SizeOf<Vector4>() * 2, true),
                 };
 
-            // Register batch
             _batchID = _batchRendererGroup.AddBatch(batchMetadata, _gpuPersistentInstanceData.bufferHandle);
 
 
@@ -111,9 +105,7 @@ namespace BatchRendererGroupExample
 
         private void Update()
         {
-            // Complete all jobs at the start of the frame.
             _boidsHandle.Complete();
-            // Set up the transform so that we have cinemachine to look at
             transform.position = *_centerFlock;
             _gpuPersistentInstanceData.SetData(_dataBuffer);
 
@@ -236,10 +228,7 @@ namespace BatchRendererGroupExample
 
         private void DisposeBoids()
         {
-            // Like the GameObjectBoidsRunner - complete all jobs before disabling
             _boidsHandle.Complete();
-
-            // Free this memory
             if (_noiseOffsets.IsCreated)
             {
                 _noiseOffsets.Dispose();
