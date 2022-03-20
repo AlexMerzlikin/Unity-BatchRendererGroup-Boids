@@ -53,19 +53,23 @@ namespace BatchRendererGroupExample
             var objectToWorldID = Shader.PropertyToID("unity_ObjectToWorld");
             var worldToObjectID = Shader.PropertyToID("unity_WorldToObject");
 
-            // float4x4.zero + per instance = { 2 * float3x4 }
-            var bigDataBufferVector4Count = 4 + Size * (2 * 3); 
+            const int matrixSizeInFloats = 4;
+            const int packedMatrixSizeInFloats = 3;
+            const int matricesPerInstance = 2;
+            // float4x4.zero + per instance data = { 2 * float3x4 }
+            var bigDataBufferVector4Count = matrixSizeInFloats + Size * packedMatrixSizeInFloats * matricesPerInstance; 
             _dataBuffer = new NativeArray<Vector4>(bigDataBufferVector4Count, Allocator.Persistent);
-            _gpuPersistentInstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferVector4Count * 16 / 4, 4);
+            var bigDataBufferFloatCount = bigDataBufferVector4Count * 4;
+            _gpuPersistentInstanceData = new GraphicsBuffer(GraphicsBuffer.Target.Raw, bigDataBufferFloatCount, 4);
 
             // 64 bytes of zeroes, so loads from address 0 return zeroes. This is a BatchRendererGroup convention.
-            _dataBuffer[0] = new Vector4(0, 0, 0, 0);
-            _dataBuffer[1] = new Vector4(0, 0, 0, 0);
-            _dataBuffer[2] = new Vector4(0, 0, 0, 0);
-            _dataBuffer[3] = new Vector4(0, 0, 0, 0);
+            _dataBuffer[0] = Vector4.zero;
+            _dataBuffer[1] = Vector4.zero;
+            _dataBuffer[2] = Vector4.zero;
+            _dataBuffer[3] = Vector4.zero;
 
-            const int positionOffset = 4 * 4 * sizeof(float);
             _gpuPersistentInstanceData.SetData(_dataBuffer);
+            var positionOffset = UnsafeUtility.SizeOf<Matrix4x4>();
             var inverseGpuAddress = positionOffset + Size * UnsafeUtility.SizeOf<float3x4>();
             var batchMetadata =
                 new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
