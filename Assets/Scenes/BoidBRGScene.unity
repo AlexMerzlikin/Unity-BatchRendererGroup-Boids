@@ -123,63 +123,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &78171729
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 78171731}
-  - component: {fileID: 78171730}
-  m_Layer: 0
-  m_Name: Boid
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &78171730
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 78171729}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: db6064c54db4411478c74f824f0fadbe, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Weights:
-    TendencyWeight: 1
-    AlignmentWeight: 1
-    NoiseWeight: 1
-  SeparationDistance: 10
-  Radius: 20
-  Size: 2
-  MaxSpeed: 6
-  RotationSpeed: 4
-  Destination: {fileID: 1714512844}
-  FlockMember: {fileID: 1803953977822841084, guid: 0a82948425b100e4ebad433d42d622aa,
-    type: 3}
-  UseSingleThread: 1
---- !u!4 &78171731
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 78171729}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &203844586
 GameObject:
   m_ObjectHideFlags: 0
@@ -306,7 +249,7 @@ GameObject:
   - component: {fileID: 909115856}
   - component: {fileID: 909115855}
   m_Layer: 0
-  m_Name: Boid (1)
+  m_Name: BoidBRG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -328,9 +271,9 @@ MonoBehaviour:
     TendencyWeight: 1
     AlignmentWeight: 1
     NoiseWeight: 1
-  SeparationDistance: 10
-  Radius: 100
-  Size: 100
+  SeparationDistance: 50
+  Radius: 500
+  Size: 2000
   MaxSpeed: 6
   RotationSpeed: 4
   Destination: {fileID: 1714512844}
@@ -349,7 +292,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 5
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &961739749
 GameObject:
@@ -488,8 +431,8 @@ MonoBehaviour:
   _motionSpeed: 1
   _motionAmplitude: 0.05
   _motionDirection: {x: 2, y: 2, z: 0}
-  _instancesCount: 1000000
-  _radius: 100
+  _instancesCount: 100
+  _radius: 10
 --- !u!114 &961739757
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -586,7 +529,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 4
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2040342131
 GameObject:
@@ -600,7 +543,7 @@ GameObject:
   - component: {fileID: 2040342133}
   - component: {fileID: 2040342132}
   m_Layer: 0
-  m_Name: Boid (2)
+  m_Name: BoidInstanced
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -613,7 +556,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2040342131}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bf9a446cda2750e40b02fe972865fc0c, type: 3}
   m_Name: 
@@ -641,7 +584,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2040342131}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db6064c54db4411478c74f824f0fadbe, type: 3}
   m_Name: 
@@ -672,5 +615,5 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 6
+  m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

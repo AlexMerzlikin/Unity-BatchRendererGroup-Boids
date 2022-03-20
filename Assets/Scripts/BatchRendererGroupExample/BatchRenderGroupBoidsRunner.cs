@@ -66,17 +66,15 @@ namespace BatchRendererGroupExample
 
             const int positionOffset = 4 * 4 * sizeof(float);
             _gpuPersistentInstanceData.SetData(_dataBuffer);
+            var inverseGpuAddress = positionOffset + Size * UnsafeUtility.SizeOf<float3x4>();
             var batchMetadata =
                 new NativeArray<MetadataValue>(2, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
                 {
                     [0] = CreateMetadataValue(objectToWorldID, positionOffset, true),
-                    [1] = CreateMetadataValue(worldToObjectID,
-                        positionOffset + Size * UnsafeUtility.SizeOf<Vector4>() * 2, true),
+                    [1] = CreateMetadataValue(worldToObjectID, inverseGpuAddress, true),
                 };
 
             _batchID = _batchRendererGroup.AddBatch(batchMetadata, _gpuPersistentInstanceData.bufferHandle);
-
-
             _initialized = true;
         }
 
