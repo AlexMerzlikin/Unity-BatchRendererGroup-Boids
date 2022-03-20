@@ -98,12 +98,12 @@ public class SimpleBRGExample : MonoBehaviour
             );
         }
 
-        // In this simple example, the instance data is placed into the buffer like this:
+        // In case of _instancesCount = 1, the instance data is placed into the buffer like this:
         // Offset | Description
         //      0 | 64 bytes of zeroes, so loads from address 0 return zeroes
         //     64 | 32 uninitialized bytes to make working with SetData easier, otherwise unnecessary
-        //     96 | unity_ObjectToWorld, three packed float3x4 matrices
-        //    144 | unity_WorldToObject, three packed float3x4 matrices
+        //     96 | unity_ObjectToWorld, float3x4 matrix
+        //    144 | unity_WorldToObject, float3x4 matrix
 
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
