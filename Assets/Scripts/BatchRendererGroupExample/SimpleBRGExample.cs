@@ -33,12 +33,14 @@ public class SimpleBRGExample : MonoBehaviour
     private float3x4[] _objectToWorld;
     private float3x4[] _worldToObject;
     private uint _byteAddressWorldToObject;
+    private uint _byteAddressObjectToWorld;
 
     // Some helper constants to make calculations later a bit more convenient.
     private const int SizeOfMatrix = sizeof(float) * 4 * 4;
     private const int SizeOfPackedMatrix = sizeof(float) * 4 * 3;
-    private const int BytesPerInstance = (SizeOfPackedMatrix * 2);
-    private const int ExtraBytes = SizeOfMatrix;
+    private const int BytesPerInstance = SizeOfPackedMatrix * 2;
+    private const int Offset = 32;
+    private const int ExtraBytes = SizeOfMatrix + Offset;
 
     // Raw buffers are allocated in ints, define an utility method to compute the required
     // amount of ints for our data.
@@ -108,11 +110,11 @@ public class SimpleBRGExample : MonoBehaviour
         // Compute start addresses for the different instanced properties. unity_ObjectToWorld starts
         // at address 96 instead of 64, because the computeBufferStartIndex parameter of SetData
         // is expressed as source array elements, so it is easier to work in multiples of sizeof(PackedMatrix).
-        _byteAddressWorldToObject = SizeOfPackedMatrix + SizeOfPackedMatrix * _instancesCount;
-
+        _byteAddressObjectToWorld = SizeOfPackedMatrix * 2;
+        _byteAddressWorldToObject = _byteAddressObjectToWorld + SizeOfPackedMatrix * _instancesCount;
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
         _instanceData.SetData(zero, 0, 0, 1);
-        _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
+        _instanceData.SetData(_objectToWorld, 0, (int) (_byteAddressObjectToWorld / SizeOfPackedMatrix),
             _objectToWorld.Length);
         _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),
             _worldToObject.Length);
@@ -128,7 +130,8 @@ public class SimpleBRGExample : MonoBehaviour
         {
             [0] = new MetadataValue
             {
-                NameID = Shader.PropertyToID("unity_ObjectToWorld"), Value = 0x80000000 | SizeOfPackedMatrix,
+                NameID = Shader.PropertyToID("unity_ObjectToWorld"), 
+                Value = 0x80000000 | _byteAddressObjectToWorld,
             },
             [1] = new MetadataValue
             {
@@ -170,7 +173,7 @@ public class SimpleBRGExample : MonoBehaviour
                     _worldToObject[i].c3.z - pos.z));
         }
 
-        _instanceData.SetData(_objectToWorld, 0, (int) (SizeOfPackedMatrix / SizeOfPackedMatrix),
+        _instanceData.SetData(_objectToWorld, 0, (int) (_byteAddressObjectToWorld / SizeOfPackedMatrix),
             _objectToWorld.Length);
         _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),
             _worldToObject.Length);
