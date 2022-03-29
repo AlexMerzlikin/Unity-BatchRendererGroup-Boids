@@ -111,14 +111,14 @@ namespace BatchRendererGroupExample
             transform.position = *_centerFlock;
             _gpuPersistentInstanceData.SetData(_dataBuffer);
 
-            var avgCenterJob = new BoidsPointerOnlyCopyToFloat4.AverageCenterJob
+            var avgCenterJob = new BoidsPointerOnly.AverageCenterJob
             {
                 Matrices = _matrices.SrcPtr,
                 Center = _centerFlock,
                 Size = _matrices.Size
             }.Schedule();
 
-            var boidsJob = new BoidsPointerOnlyCopyToFloat4.BatchedBoidsJob
+            var boidsJob = new BoidsPointerOnly.BatchedBoidJob
             {
                 Weights = Weights,
                 Goal = Destination.position,
@@ -131,12 +131,18 @@ namespace BatchRendererGroupExample
                 Size = _matrices.Size,
                 Src = _matrices.SrcPtr,
                 Dst = _matrices.DstPtr,
-                DataBuffer = _dataBuffer
             }.Schedule(_matrices.Size, 32);
 
-            var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob);
+            var copyJob = new CopyMatricesJob
+            {
+                DataBuffer = _dataBuffer,
+                Size = _matrices.Size,
+                Source = _matrices.SrcPtr
+            }.Schedule(_matrices.Size, 32);
+            
+            var combinedJob = JobHandle.CombineDependencies(boidsJob, avgCenterJob, copyJob);
 
-            _boidsHandle = new BoidsPointerOnlyCopyToFloat4.CopyMatrixJob
+            _boidsHandle = new BoidsPointerOnly.CopyMatrixJob
             {
                 Dst = _matrices.SrcPtr,
                 Src = _matrices.DstPtr

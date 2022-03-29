@@ -115,10 +115,8 @@ public class SimpleBRGExample : MonoBehaviour
 
         // Upload our instance data to the GraphicsBuffer, from where the shader can load them.
         _instanceData.SetData(zero, 0, 0, 1);
-        _instanceData.SetData(_objectToWorld, 0, (int) (_byteAddressObjectToWorld / SizeOfPackedMatrix),
-            _objectToWorld.Length);
-        _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),
-            _worldToObject.Length);
+        _instanceData.SetData(_objectToWorld, 0, (int) (_byteAddressObjectToWorld / SizeOfPackedMatrix), _objectToWorld.Length);
+        _instanceData.SetData(_worldToObject, 0, (int) (_byteAddressWorldToObject / SizeOfPackedMatrix),_worldToObject.Length);
 
         // Set up metadata values to point to the instance data. Set the most significant bit 0x80000000 in each,
         // which instructs the shader that the data is an array with one value per instance, indexed by the instance index.
