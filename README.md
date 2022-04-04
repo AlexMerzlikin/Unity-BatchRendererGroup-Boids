@@ -1,6 +1,6 @@
 # Unity-BatchRendererGroup-Boids
 
-A simple example how to use the new BatchRendererGroup API to render boids made for my blog at https://gamedev.center. The post to be published soon.
+A simple example how to use the new BatchRendererGroup API to render boids made for my blog at https://gamedev.center/trying-out-new-unity-api-batchrenderergroup/. The post to be published soon.
 
 For calculating boids behaviour I used [ta-boids](https://github.com/ThousandAnt/ta-boids).
 
