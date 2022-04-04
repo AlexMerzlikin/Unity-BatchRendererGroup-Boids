@@ -2,6 +2,8 @@
 
 A simple example how to use the new BatchRendererGroup API to render boids made for my blog at https://gamedev.center/trying-out-new-unity-api-batchrenderergroup/. The post to be published soon.
 
+![](BRG_Boids.gif)
+
 For calculating boids behaviour I used [ta-boids](https://github.com/ThousandAnt/ta-boids).
 
 However, for me this boids solution turned out to be a bit unstable, as even little performance dips or interaction with the editor breaks the __centerFlock_ pointer, leaves it as (NaN, Nan, NaN) and boids stop working both for my BRG variant, as well as GameObject and Instanced variants provided in the boids repo. 
