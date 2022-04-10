@@ -10,6 +10,7 @@ Shader "CustomURP/Unlit Fish"
         _WaveDensity("Wave Density", Range(0.0001,1.0)) = 0.007
         _Yoffset("Y Offset",Float) = 0.0
         _Threshold("Threshold",Range(0,30)) = 3
+        _HeadLimit("HeadLimit", Range(-5, 5)) = 0.05
     }
 
     SubShader
@@ -65,6 +66,7 @@ Shader "CustomURP/Unlit Fish"
             half _WaveDensity;
             half _Yoffset;
             int _Threshold;
+            half _HeadLimit;
             CBUFFER_END
 
             #ifdef UNITY_DOTS_INSTANCING_ENABLED
@@ -76,6 +78,7 @@ Shader "CustomURP/Unlit Fish"
                     UNITY_DOTS_INSTANCED_PROP(half, _WaveDensity)
                     UNITY_DOTS_INSTANCED_PROP(half, _Yoffset)
                     UNITY_DOTS_INSTANCED_PROP(half, _Threshold)
+                    UNITY_DOTS_INSTANCED_PROP(half, _HeadLimit)
                 UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                 #define _BaseColor UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseColor)
                 #define _EffectRadius UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _EffectRadius)
@@ -84,6 +87,7 @@ Shader "CustomURP/Unlit Fish"
                 #define _WaveDensity UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _WaveDensity)
                 #define _Yoffset UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _Yoffset)
                 #define _Threshold UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _Threshold)
+                #define _HeadLimit UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _HeadLimit)
             #endif
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -95,7 +99,17 @@ Shader "CustomURP/Unlit Fish"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
 
-                half sinUse = sin(-_Time.y * _WaveSpeed + input.positionOS.z * _WaveDensity);
+                const half z = input.positionOS.z;
+                half sinUse;
+                if (z > _HeadLimit)
+                {
+                    sinUse = sin(-_Time.y * _WaveSpeed + z * _WaveDensity * _HeadLimit);
+                }
+                else
+                {
+                    sinUse = sin(-_Time.y * _WaveSpeed + z * _WaveDensity * z);
+                }
+
                 half yValue = input.positionOS.y - _Yoffset;
                 half yDirScaling = clamp(pow(yValue * _EffectRadius, _Threshold), 0.0, 1.0);
                 input.positionOS.x = input.positionOS.x + sinUse * _WaveHeight * yDirScaling;
