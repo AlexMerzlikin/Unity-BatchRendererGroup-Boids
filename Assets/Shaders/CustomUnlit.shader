@@ -28,13 +28,19 @@ Shader "CustomURP/Unlit"
             #pragma target 4.5
             #pragma vertex UnlitPassVertex
             #pragma fragment UnlitPassFragment
+            #pragma multi_compile_instancing
+            #pragma instancing_options renderinglayer
+            #pragma multi_compile _ DOTS_INSTANCING_ON
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityDOTSInstancing.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
                 float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
@@ -42,18 +48,30 @@ Shader "CustomURP/Unlit"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
-
-            sampler2D _BaseMap;
 
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             float4 _BaseColor;
             CBUFFER_END
 
+            #ifdef UNITY_DOTS_INSTANCING_ENABLED
+                UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
+                    UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
+                UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
+                #define _BaseColor UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseColor)
+            #endif
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
             Varyings UnlitPassVertex(Attributes input)
             {
                 Varyings output;
+
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 const VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = positionInputs.positionCS;
@@ -62,15 +80,17 @@ Shader "CustomURP/Unlit"
                 return output;
             }
 
-
             half4 UnlitPassFragment(Varyings input) : SV_Target
             {
-                half4 baseMap = tex2D(_BaseMap, input.uv);
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                // half4 baseMap = tex2D(_BaseMap, input.uv);
+                half4 baseMap = half4(SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv));
+
                 return baseMap * _BaseColor * input.color;
             }
             ENDHLSL
-
-
         }
     }
 }

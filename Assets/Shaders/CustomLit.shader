@@ -1,5 +1,5 @@
 // This shader works with URP 7.1.x and above
-Shader "Custom/Physics Static"
+Shader "CustomURP/Lit"
 {
     Properties
     {
@@ -8,16 +8,6 @@ Shader "Custom/Physics Static"
 
         [MainColor] _BaseColor("Color", Color) = (0.5,0.5,0.5,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
-        _TextureTilingScale("Scale", Range(0.01,10)) = 1
-        [MaterialToggle] _TopDown("Top Down", Float) = 0
-        _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
-
-        _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
-
-        [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
-
-        [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
-        [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
 
         // Blending state
         [HideInInspector] _Surface("__surface", Float) = 0.0
@@ -27,8 +17,6 @@ Shader "Custom/Physics Static"
         [HideInInspector] _DstBlend("__dst", Float) = 0.0
         [HideInInspector] _ZWrite("__zw", Float) = 1.0
         [HideInInspector] _Cull("__cull", Float) = 2.0
-
-        _ReceiveShadows("Receive Shadows", Float) = 1.0
 
         // Editmode prop
         [HideInInspector] _QueueOffset("Queue offset", Float) = 0.0
@@ -102,15 +90,6 @@ Shader "Custom/Physics Static"
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             half4 _BaseColor;
-            half _TopDown;
-            half _TextureTilingScale;
-            half _Cutoff;
-            half _Smoothness;
-            half _Metallic;
-            half _BumpScale;
-            half _ClearCoatMask;
-            half _ClearCoatSmoothness;
-            half _Surface;
             CBUFFER_END
 
             // NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
@@ -119,31 +98,11 @@ Shader "Custom/Physics Static"
             #ifdef UNITY_DOTS_INSTANCING_ENABLED
 UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
 UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
-UNITY_DOTS_INSTANCED_PROP(float, _TopDown)
-UNITY_DOTS_INSTANCED_PROP(float, _TextureTilingScale)
-UNITY_DOTS_INSTANCED_PROP(float, _Cutoff)
-UNITY_DOTS_INSTANCED_PROP(float, _Smoothness)
-UNITY_DOTS_INSTANCED_PROP(float, _Metallic)
-UNITY_DOTS_INSTANCED_PROP(float, _BumpScale)
-UNITY_DOTS_INSTANCED_PROP(float, _ClearCoatMask)
-UNITY_DOTS_INSTANCED_PROP(float, _ClearCoatSmoothness)
-UNITY_DOTS_INSTANCED_PROP(float, _Surface)
 UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 
 #define _BaseColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4 , _BaseColor)
-#define _TopDown                UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _TopDown)
-#define _TextureTilingScale     UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _TextureTilingScale)
-#define _Cutoff                 UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Cutoff)
-#define _Smoothness             UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Smoothness)
-#define _Metallic               UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Metallic)
-#define _BumpScale              UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _BumpScale)
-#define _ClearCoatMask          UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatMask)
-#define _ClearCoatSmoothness    UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatSmoothness)
-#define _Surface                UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Surface)
             #endif
 
-
-            // #include "PhysicsStaticInputs.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             struct Attributes
@@ -164,7 +123,6 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                 float3 normalWS : TEXCOORD2;
                 float2 uv : TEXCOORD3;
                 float3 viewDirWS : TEXCOORD4;
-                half4 fogFactorAndVertexLight : TEXCOORD5; // x: fogFactor, yzw: vertex light
 
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
                 float4 shadowCoord              : TEXCOORD6;
@@ -172,7 +130,6 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 
                 float4 positionCS : SV_POSITION;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
-                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData)
@@ -189,16 +146,7 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                 inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
                 inputData.viewDirectionWS = viewDirWS;
 
-                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
-                inputData.shadowCoord = input.shadowCoord;
-                #elif defined(MAIN_LIGHT_CALCULATE_SHADOWS)
-                inputData.shadowCoord = TransformWorldToShadowCoord(inputData.positionWS);
-                #else
                 inputData.shadowCoord = float4(0, 0, 0, 0);
-                #endif
-
-                inputData.fogCoord = input.fogFactorAndVertexLight.x;
-                inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
                 inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
             }
 
@@ -209,7 +157,6 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
@@ -218,21 +165,8 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                 // also required for per-vertex lighting and SH evaluation
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
                 float3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
-                half3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-                half fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
 
-                float3 sp = vertexInput.positionWS * _TextureTilingScale;
-                if (_TopDown < 1.0)
-                {
-                    if (abs(normalInput.normalWS.x) > 0.5)
-                        output.uv = sp.yz;
-                    else
-                        output.uv = abs(normalInput.normalWS.z) > 0.5 ? sp.xy : sp.xz;
-                }
-                else
-                {
-                    output.uv = sp.xz;
-                }
+                float3 sp = vertexInput.positionWS;
 
                 output.uv = TRANSFORM_TEX(output.uv, _BaseMap);
 
@@ -242,8 +176,6 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 
                 OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
                 OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
-
-                output.fogFactorAndVertexLight = half4(fogFactor, vertexLight);
 
                 output.positionWS = vertexInput.positionWS;
 
@@ -259,27 +191,24 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
             inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfaceData)
             {
                 half4 albedoAlpha = SampleAlbedoAlpha(uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
-                outSurfaceData.alpha = Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
+                outSurfaceData.alpha = Alpha(albedoAlpha.a, _BaseColor, 1);
 
-                half4 specGloss = half4(_Metallic.rrr, _Smoothness);
                 outSurfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
 
-                outSurfaceData.metallic = specGloss.r;
                 outSurfaceData.specular = half3(0.0h, 0.0h, 0.0h);
-                outSurfaceData.smoothness = specGloss.a;
                 outSurfaceData.normalTS = 1.0;
                 outSurfaceData.occlusion = 1.0;
                 outSurfaceData.emission = 0;
-
-                outSurfaceData.clearCoatMask = _ClearCoatMask;
-                outSurfaceData.clearCoatSmoothness = _ClearCoatSmoothness;
+                outSurfaceData.metallic = 0;
+                outSurfaceData.smoothness = 0;
+                outSurfaceData.clearCoatMask = 0;
+                outSurfaceData.clearCoatSmoothness = 0;
             }
 
             // Used in Standard (Physically Based) shader
             half4 LitPassFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 SurfaceData surfaceData;
 
@@ -293,204 +222,10 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                                                    surfaceData.specular, surfaceData.smoothness, surfaceData.occlusion,
                                                    surfaceData.emission, surfaceData.alpha);
 
-                color.rgb = MixFog(color.rgb, inputData.fogCoord);
                 color.a = OutputAlpha(color.a);
-
                 return color;
             }
             ENDHLSL
         }
-
-        Pass
-        {
-            Name "ShadowCaster"
-            Tags
-            {
-                "LightMode" = "ShadowCaster"
-            }
-
-            ZWrite On
-            ZTest LEqual
-
-            HLSLPROGRAM
-            // Required to compile gles 2.0 with standard srp library
-            #pragma prefer_hlslcc gles
-            #pragma exclude_renderers d3d11_9x gles
-            #pragma target 4.5
-
-            // Material Keywords
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
-            // GPU Instancing
-            #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
-
-            // #include "PhysicsStaticInputs.hlsl" //order dependent
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-   // NOTE: Do not ifdef the properties here as SRP batcher can not handle different layouts.
-            CBUFFER_START(UnityPerMaterial)
-            float4 _BaseMap_ST;
-            half4 _BaseColor;
-            half _TopDown;
-            half _TextureTilingScale;
-            half _Cutoff;
-            half _Smoothness;
-            half _Metallic;
-            half _BumpScale;
-            half _ClearCoatMask;
-            half _ClearCoatSmoothness;
-            half _Surface;
-            CBUFFER_END
-
-            // NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
-            // Otherwise you might break CPU-side as property constant-buffer offsets change per variant.
-            // NOTE: Dots instancing is orthogonal to the constant buffer above.
-            #ifdef UNITY_DOTS_INSTANCING_ENABLED
-UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
-UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
-UNITY_DOTS_INSTANCED_PROP(float, _TopDown)
-UNITY_DOTS_INSTANCED_PROP(float, _TextureTilingScale)
-UNITY_DOTS_INSTANCED_PROP(float, _Cutoff)
-UNITY_DOTS_INSTANCED_PROP(float, _Smoothness)
-UNITY_DOTS_INSTANCED_PROP(float, _Metallic)
-UNITY_DOTS_INSTANCED_PROP(float, _BumpScale)
-UNITY_DOTS_INSTANCED_PROP(float, _ClearCoatMask)
-UNITY_DOTS_INSTANCED_PROP(float, _ClearCoatSmoothness)
-UNITY_DOTS_INSTANCED_PROP(float, _Surface)
-UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
-
-#define _BaseColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4 , _BaseColor)
-#define _TopDown                UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _TopDown)
-#define _TextureTilingScale     UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _TextureTilingScale)
-#define _Cutoff                 UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Cutoff)
-#define _Smoothness             UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Smoothness)
-#define _Metallic               UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Metallic)
-#define _BumpScale              UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _BumpScale)
-#define _ClearCoatMask          UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatMask)
-#define _ClearCoatSmoothness    UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatSmoothness)
-#define _Surface                UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Surface)
-            #endif
-
-            float3 _LightDirection;
-
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-                float3 normalOS : NORMAL;
-                float2 texcoord : TEXCOORD0;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
-            };
-
-            struct Varyings
-            {
-                float2 uv : TEXCOORD0;
-                float4 positionCS : SV_POSITION;
-            };
-
-            Varyings ShadowPassVertex(Attributes input)
-            {
-                Varyings output;
-                UNITY_SETUP_INSTANCE_ID(input);
-
-
-                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
-                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
-
-                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
-
-                #if UNITY_REVERSED_Z
-                positionCS.z = min(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
-                #else
-                    positionCS.z = max(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
-                #endif
-
-                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
-                output.positionCS = positionCS;
-                return output;
-            }
-
-            half4 ShadowPassFragment(Varyings input) : SV_TARGET
-            {
-                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
-                return 0;
-            }
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Name "DepthOnly"
-            Tags
-            {
-                "LightMode" = "DepthOnly"
-            }
-
-            ZWrite On
-            ZTest LEqual
-
-            HLSLPROGRAM
-            // Required to compile gles 2.0 with standard srp library
-            #pragma prefer_hlslcc gles
-            #pragma exclude_renderers d3d11_9x gles
-            #pragma target 4.5
-
-            // Material Keywords
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
-            // GPU Instancing
-            #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-
-            #pragma vertex DepthOnlyVertex
-            #pragma fragment DepthOnlyFragment
-
-            #include "PhysicsStaticInputs.hlsl"
-
-            struct Attributes
-            {
-                float4 position : POSITION;
-                float2 texcoord : TEXCOORD0;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
-            };
-
-            struct Varyings
-            {
-                float2 uv : TEXCOORD0;
-                float4 positionCS : SV_POSITION;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
-                UNITY_VERTEX_OUTPUT_STEREO
-            };
-
-            Varyings DepthOnlyVertex(Attributes input)
-            {
-                Varyings output = (Varyings)0;
-                UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-
-                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
-                output.positionCS = TransformObjectToHClip(input.position.xyz);
-                return output;
-            }
-
-            half4 DepthOnlyFragment(Varyings input) : SV_TARGET
-            {
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-
-                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
-                return 0;
-            }
-            ENDHLSL
-        }
-        //NOTE: Keep this usepass here in case we want to allow light baking
-        //// Used for Baking GI. This pass is stripped from build.
-        //UsePass "Universal Render Pipeline/Lit/Meta"
     }
 }
