@@ -3,7 +3,13 @@ Shader "CustomURP/Unlit Fish"
     Properties
     {
         _BaseMap ("Base Texture", 2D) = "white" {}
-        _BaseColor ("Base Colour", Color) = (0, 0.66, 0.73, 1)
+        _BaseColor ("Base Colour", Color) = (1, 1, 1, 1)
+        _EffectRadius("Wave Effect Radius",Range(0.0,1.0)) = 0.5
+        _WaveSpeed("Wave Speed", Range(0.0,100.0)) = 3.0
+        _WaveHeight("Wave Height", Range(0.0,30.0)) = 5.0
+        _WaveDensity("Wave Density", Range(0.0001,1.0)) = 0.007
+        _Yoffset("Y Offset",Float) = 0.0
+        _Threshold("Threshold",Range(0,30)) = 3
     }
 
     SubShader
@@ -53,13 +59,31 @@ Shader "CustomURP/Unlit Fish"
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             float4 _BaseColor;
+            half _EffectRadius;
+            half _WaveSpeed;
+            half _WaveHeight;
+            half _WaveDensity;
+            half _Yoffset;
+            int _Threshold;
             CBUFFER_END
 
             #ifdef UNITY_DOTS_INSTANCING_ENABLED
                 UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
                     UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
+                    UNITY_DOTS_INSTANCED_PROP(half, _EffectRadius)
+                    UNITY_DOTS_INSTANCED_PROP(half, _WaveSpeed)
+                    UNITY_DOTS_INSTANCED_PROP(half, _WaveHeight)
+                    UNITY_DOTS_INSTANCED_PROP(half, _WaveDensity)
+                    UNITY_DOTS_INSTANCED_PROP(half, _Yoffset)
+                    UNITY_DOTS_INSTANCED_PROP(half, _Threshold)
                 UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
                 #define _BaseColor UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseColor)
+                #define _EffectRadius UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _EffectRadius)
+                #define _WaveSpeed UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _WaveSpeed)
+                #define _WaveHeight UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _WaveHeight)
+                #define _WaveDensity UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _WaveDensity)
+                #define _Yoffset UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _Yoffset)
+                #define _Threshold UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(half, _Threshold)
             #endif
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -70,13 +94,6 @@ Shader "CustomURP/Unlit Fish"
 
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
-
-                half _EffectRadius = 0;
-                half _WaveSpeed = 3.5;
-                half _WaveHeight = 0.25;
-                half _WaveDensity = 0.69;
-                half _Yoffset = 0.89;
-                int _Threshold = 0.06;
 
                 half sinUse = sin(-_Time.y * _WaveSpeed + input.positionOS.z * _WaveDensity);
                 half yValue = input.positionOS.y - _Yoffset;
