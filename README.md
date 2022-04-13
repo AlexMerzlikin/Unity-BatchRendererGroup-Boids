@@ -12,6 +12,11 @@ Anyway it suits my goal to test BRG compared to GameObjects and Instancing.
 
 All samples are present in the sample scene: [BoidBRGScene](https://github.com/AlexMerzlikin/Unity-BatchRendererGroup-Boids/blob/master/Assets/Scenes/BoidBRGScene.unity). Just turn on and off the ones you would like to check.
 
+# Custom Universal Render Pipeline Shader With DOTS Instancing Support
+
+The repo also contains the most basic example of [a custom URP shader](https://github.com/AlexMerzlikin/Unity-BatchRendererGroup-Boids/blob/master/Assets/Shaders/CustomURPUnlit.shader) thats supports DOTS instancing and therefore can be used with BRG.
+![](URP_shader_with_dots_instancing_support.png)
+
 # References
 https://forum.unity.com/threads/new-batchrenderergroup-api-for-2022-1.1230669/
 
